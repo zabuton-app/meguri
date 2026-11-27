@@ -7,11 +7,17 @@ on:
       - develop
   pull_request:
   workflow_dispatch:
+  # build.yml runs these checks before it builds a release.
+  workflow_call:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+# Called from build.yml, github.workflow is the caller's name: a release build
+# run by hand on main does not cancel, nor get cancelled by, the tests of a
+# push to main; and a release build's checks are never cancelled, so a second
+# build of the same ref waits instead of silently skipping the first.
 concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'Test' }}
 
 # The checks run as parallel jobs, so the wall-clock time is bound by the
 # slowest one (E2E) rather than the sum of all steps. Each job runs its own
@@ -20,19 +26,21 @@ concurrency:
 # All jobs pin the image: the core suite and E2E run Electron, and the Electron
 # binary dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the
 # GitHub ubuntu runner already provides via its preinstalled browsers. The
-# renderer job does not need Electron but uses the same image to keep the jobs
-# alike.
+# renderer and lint jobs do not need Electron but use the same image to keep
+# the jobs alike. `core-macos` and `core-windows` are the jobs off Ubuntu.
 #
 # Keep node-version the same in every job and in build.yml (see engines.node in
-# package.json).
+# package.json), and the macOS runner the same as the mac build in build.yml.
+# build.yml builds Windows on windows-latest, which windows-2025 is today;
+# pinned here so a runner rollover cannot change what the tests ran on.
 jobs:
   core:
     name: Type check and core tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Keep in sync with engines.node in package.json; react-router v8 needs 22.22+.
           node-version: 22.22.x
@@ -50,13 +58,55 @@ jobs:
       - name: Run core tests
         run: npm run test:core
 
+  # Core tests that only make sense on macOS (`skipIf(process.platform !==
+  # "darwin")`) are skipped on Ubuntu, so they run here. Only the core suite
+  # has such tests, so the other checks stay on Ubuntu only.
+  core-macos:
+    name: Core tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run core tests
+        run: npm run test:core
+
+  # The one Windows job. The core suite is where the platform shows through —
+  # rel_path separators, CRLF from ffprobe, file locking, the symlink privilege
+  # (#297) — and a Windows installer is built, so it is worth a check that the
+  # build matrix alone would not give. The runner is an administrator, so the
+  # symlink cases CAN_SYMLINK skips on an ordinary local machine run here.
+  core-windows:
+    name: Core tests (Windows)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run core tests
+        run: npm run test:core
+
   renderer:
     name: Renderer tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.22.x
           cache: npm
@@ -68,13 +118,35 @@ jobs:
       - name: Run renderer tests
         run: npm run test:renderer
 
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      # Linting reads the sources and the installed type declarations only, so
+      # the install scripts (Electron download, native rebuild) are skipped.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
   e2e:
     name: E2E tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.22.x
           cache: npm
@@ -86,7 +158,7 @@ jobs:
       # `playwright install` step: xvfb comes with the runner image.
       #
       # Ubuntu 24.04 restricts unprivileged user namespaces; Electron needs this sysctl.
-      # Builds, then runs under Xvfb pinned to X11 (same as local runs).
+      # Builds, then runs pinned to X11 with one Xvfb display per worker (same as local runs).
       - name: Run E2E tests
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0

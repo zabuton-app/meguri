@@ -60,6 +60,7 @@ export function CollectionEditDialog({
       void invalidateList();
       onCreated?.();
     },
+    meta: { reportsOwnError: true },
     onError: (error) => {
       toast.error(t("collection.createFailed"), {
         description: error instanceof Error ? error.message : String(error),

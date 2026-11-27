@@ -7,6 +7,14 @@ import { setListCounts } from "@/hooks/useListCounts";
 import { defaultAppStatus } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
+const live = vi.hoisted(() => ({ listeners: 0 }));
+const listen = vi.hoisted(() => () => {
+  live.listeners++;
+  return () => {
+    live.listeners--;
+  };
+});
+
 vi.mock("@/ipc/client", () => ({
   api: {
     appStatus: () => Promise.resolve(defaultAppStatus),
@@ -14,9 +22,9 @@ vi.mock("@/ipc/client", () => ({
       Promise.resolve({ fileCount: 1234, lastScanAt: null }),
   },
   events: {
-    onScanProgress: vi.fn().mockResolvedValue(() => {}),
-    onScanDone: vi.fn().mockResolvedValue(() => {}),
-    onWorkspaceChanged: vi.fn().mockResolvedValue(() => {}),
+    onScanProgress: listen,
+    onScanDone: listen,
+    onWorkspaceChanged: listen,
   },
   ALL_ID: "__all__",
 }));
@@ -54,5 +62,14 @@ describe("StatusBar counts", () => {
     const [left, right] = Array.from(bar().children);
     expect(within(left as HTMLElement).queryByText(/Last scan/)).toBeNull();
     expect(within(right as HTMLElement).getByText(/Last scan/)).toBeTruthy();
+  });
+
+  // A cleanup that runs in the same tick as the subscription (StrictMode's
+  // replay, a quick unmount) must still take every listener down (#271).
+  it("removes its event listeners when unmounted right after mounting", () => {
+    const { unmount } = renderWithProviders(<StatusBar />);
+    expect(live.listeners).toBe(3);
+    unmount();
+    expect(live.listeners).toBe(0);
   });
 });

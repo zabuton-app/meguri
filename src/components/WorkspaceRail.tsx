@@ -58,11 +58,12 @@ import { cn } from "@/lib/utils";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
-import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
 import type { DraggedFile } from "@/lib/fileDrag";
+import { AppLogo } from "@/components/AppLogo";
+import { usePreferences } from "@/settings/PreferencesProvider";
 
 /** Never animate sortable layout changes, so items snap to their final position on drop. */
 const animateLayoutChanges: AnimateLayoutChanges = () => false;
@@ -73,7 +74,19 @@ const animateLayoutChanges: AnimateLayoutChanges = () => false;
  * users get the same highlight without it.
  */
 const DROP_OVER =
-  "rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-bg motion-safe:scale-110 motion-reduce:transition-none";
+  "ring-2 ring-primary ring-offset-2 ring-offset-chrome motion-safe:scale-110 motion-reduce:transition-none";
+
+/**
+ * The rail's buttons sit on the frame with no fill of their own, as the title
+ * bar's do (#585): a tint on hover, and the selected one tinted with a bar at
+ * the rail's edge, as VS Code's activity bar.
+ */
+const TILE =
+  "flex size-11 shrink-0 items-center justify-center rounded-card transition";
+const TILE_IDLE = "text-muted hover:bg-fg/10 hover:text-fg";
+const TILE_SELECTED =
+  "relative bg-primary/15 text-fg before:absolute before:inset-y-3 before:-left-2.5 before:w-0.75 before:rounded-full before:bg-primary";
+const TILE_ADD = `${TILE} border border-dashed border-border text-muted hover:border-primary hover:text-primary`;
 
 /** Builds avatar initials from a label (2 chars for alphanumerics, 1 char for Japanese, etc.). */
 function initials(label: string): string {
@@ -88,8 +101,9 @@ export function WorkspaceRail() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const { t } = useI18n();
-  // In-app logo mark follows the selected variant (Settings > App logo).
-  const { logo } = useLogo();
+  // The logo comes down here while the window buttons take the title bar's
+  // left end, where it otherwise sits above the rail (TitleBar.tsx).
+  const logoHere = usePreferences().windowButtons === "left";
   const addedWorkspaceScanJobs = useRef(new Set<string>());
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   // null = create mode; a collection = edit mode for it.
@@ -113,12 +127,9 @@ export function WorkspaceRail() {
 
   // Also track changes from other paths (e.g. the add button in the empty state).
   useEffect(() => {
-    const unlistens: Array<() => void> = [];
-    void events
-      .onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc))
-      .then((u) => unlistens.push(u));
-    void events
-      .onScanDone((done) => {
+    const unlistens = [
+      events.onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc)),
+      events.onScanDone((done) => {
         if (!addedWorkspaceScanJobs.current.has(done.jobId)) return;
         addedWorkspaceScanJobs.current.delete(done.jobId);
         // A failed or canceled scan is told about by Home (#313).
@@ -126,8 +137,8 @@ export function WorkspaceRail() {
         toast.success(t("home.scanComplete"), {
           description: t("home.scanCompleteDetail", done.stats),
         });
-      })
-      .then((u) => unlistens.push(u));
+      }),
+    ];
     return () => unlistens.forEach((u) => u());
   }, [qc, t]);
 
@@ -155,6 +166,7 @@ export function WorkspaceRail() {
       }
       onAdded(r);
     },
+    meta: { reportsOwnError: true },
     onError: (e, dir) =>
       toast.error(t("drop.addFailed", { name: dir.name }), {
         description: e instanceof Error ? e.message : String(e),
@@ -204,6 +216,9 @@ export function WorkspaceRail() {
       toast.success(t("workspace.removedToast"), {
         description: t("workspace.removedToastDetail", { label }),
       });
+      // Tags held only by the workspace that went are no longer there to
+      // complete (a switch leaves the catalog as it is).
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
       void refreshAll();
     },
   });
@@ -310,16 +325,13 @@ export function WorkspaceRail() {
     <>
       <nav
         data-slot="workspace-rail"
-        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3"
+        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 bg-chrome pb-3 pt-1 text-fg"
       >
-        <img
-          src={LOGO_SRC[logo]}
-          alt="Meguri"
-          className="size-[50px] shrink-0"
-        />
+        {logoHere && <AppLogo className="size-[50px]" />}
 
-        {/* Workspace list (scrolls only here when there are many).
-          Add padding so the first avatar's selection ring (ring-2) is not clipped at the top edge. */}
+        {/* Workspace list (scrolls only here when there are many). The
+          padding keeps the ring of a collection files are dragged over from
+          being clipped at the edges. */}
         <ScrollArea
           type="scroll"
           className="min-h-0 w-full flex-1"
@@ -398,7 +410,7 @@ export function WorkspaceRail() {
                 data-tour="collections"
                 title={t("collection.create")}
                 aria-label={t("collection.create")}
-                className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-border text-muted transition hover:rounded-xl hover:border-primary hover:text-primary"
+                className={cn(TILE_ADD, "border-solid")}
               >
                 <FolderPlus className="size-5" />
               </button>
@@ -439,7 +451,7 @@ export function WorkspaceRail() {
               onClick={() => addViaPicker.mutate()}
               data-tour="add-workspace"
               title={t("workspace.addDirectory")}
-              className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-dashed border-border text-muted transition hover:rounded-xl hover:border-primary hover:text-primary"
+              className={TILE_ADD}
             >
               <Plus className="size-5" />
             </button>
@@ -456,7 +468,7 @@ export function WorkspaceRail() {
           data-tour="command-menu"
           title={`${t("command.title")} (Ctrl+K)`}
           aria-label={t("command.title")}
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted transition hover:rounded-xl hover:bg-overlay hover:text-fg"
+          className={cn(TILE, TILE_IDLE)}
         >
           <Keyboard className="size-5" />
         </button>
@@ -465,7 +477,7 @@ export function WorkspaceRail() {
           onClick={openShortcuts}
           title={`${t("shortcuts.title")} (?)`}
           aria-label={t("shortcuts.title")}
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted transition hover:rounded-xl hover:bg-overlay hover:text-fg"
+          className={cn(TILE, TILE_IDLE)}
         >
           <HelpCircle className="size-5" />
         </button>
@@ -476,7 +488,7 @@ export function WorkspaceRail() {
           }}
           data-tour="settings"
           title={t("workspace.settings")}
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted transition hover:rounded-xl hover:bg-overlay hover:text-fg"
+          className={cn(TILE, TILE_IDLE)}
         >
           <Settings className="size-5" />
         </button>
@@ -521,10 +533,9 @@ function WatchLaterButton({
       aria-label={label}
       {...drop.handlers}
       className={cn(
-        "flex size-11 shrink-0 items-center justify-center text-sm font-semibold transition",
-        collection.active
-          ? "rounded-xl bg-primary text-primary-foreground ring-2 ring-fg/40"
-          : "rounded-2xl bg-surface text-fg hover:rounded-xl hover:bg-overlay",
+        TILE,
+        "text-sm font-semibold",
+        collection.active ? TILE_SELECTED : TILE_IDLE,
         drop.over && DROP_OVER,
       )}
     >
@@ -586,10 +597,9 @@ function CollectionButton({
             {...sortable.listeners}
             {...drop.handlers}
             className={cn(
-              "flex size-11 touch-none items-center justify-center text-sm font-semibold transition",
-              collection.active
-                ? "rounded-xl bg-primary text-primary-foreground ring-2 ring-fg/40"
-                : "rounded-2xl bg-surface text-fg hover:rounded-xl hover:bg-overlay",
+              TILE,
+              "touch-none text-sm font-semibold",
+              collection.active ? TILE_SELECTED : TILE_IDLE,
               drop.over && DROP_OVER,
             )}
           >
@@ -665,11 +675,10 @@ function WorkspaceButton({
       {...(isAll ? {} : sortable.attributes)}
       {...(isAll ? {} : sortable.listeners)}
       className={cn(
-        "flex size-11 items-center justify-center text-sm font-semibold transition",
+        TILE,
+        "text-sm font-semibold",
         !isAll && "touch-none",
-        workspace.active
-          ? "rounded-xl bg-primary text-primary-foreground ring-2 ring-fg/40"
-          : "rounded-2xl bg-surface text-fg hover:rounded-xl hover:bg-overlay",
+        workspace.active ? TILE_SELECTED : TILE_IDLE,
       )}
     >
       {isAll ? (
@@ -714,7 +723,7 @@ function FolderDropOverlay({ t }: { t: TFunc }) {
   return (
     <div
       data-testid="folder-drop-overlay"
-      className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-bg/70 p-6 backdrop-blur-sm"
+      className="pointer-events-none fixed inset-below-title-bar z-[100] flex items-center justify-center bg-bg/70 p-6 backdrop-blur-sm"
     >
       <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-surface/90 px-10 py-8 text-center">
         <FolderPlus className="size-10 text-primary" />

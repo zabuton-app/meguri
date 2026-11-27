@@ -1,6 +1,7 @@
 // shadcn/ui DropdownMenu (Radix implementation). Colors use our semantic tokens.
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { focusOpenConfirm } from "@/lib/keyTarget";
 import { cn } from "@/lib/utils";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -18,10 +19,14 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg",
+          "z-50 min-w-32 overflow-hidden rounded-control border border-border bg-popover p-1 text-popover-foreground shadow-lg",
           className,
         )}
         {...props}
+        onCloseAutoFocus={(e) => {
+          props.onCloseAutoFocus?.(e);
+          focusOpenConfirm(e);
+        }}
       />
     </DropdownMenuPrimitive.Portal>
   );
@@ -35,7 +40,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-item px-2 py-1.5 text-sm outline-none",
         "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
         className,

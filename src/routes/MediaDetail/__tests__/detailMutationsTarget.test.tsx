@@ -3,7 +3,7 @@
 // settles (#258).
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, waitFor } from "@testing-library/react";
-import type { FileDetail } from "@/ipc/types";
+import type { FileDetail, FileRow } from "@/ipc/types";
 import {
   createTestQueryClient,
   renderWithProviders,
@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
   fileDeleteFromIndex: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   thumbSetOffset: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   fileSetRating: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  bookmarkAdd: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  bookmarkRemove: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  fileAddTag: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  fileGet: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
 }));
 
 vi.mock("@/components/ConfirmDialog", async (importOriginal) => ({
@@ -28,6 +32,10 @@ vi.mock("@/ipc/client", () => ({
     fileDeleteFromIndex: (...a: unknown[]) => mocks.fileDeleteFromIndex(...a),
     thumbSetOffset: (...a: unknown[]) => mocks.thumbSetOffset(...a),
     fileSetRating: (...a: unknown[]) => mocks.fileSetRating(...a),
+    bookmarkAdd: (...a: unknown[]) => mocks.bookmarkAdd(...a),
+    bookmarkRemove: (...a: unknown[]) => mocks.bookmarkRemove(...a),
+    fileAddTag: (...a: unknown[]) => mocks.fileAddTag(...a),
+    fileGet: (...a: unknown[]) => mocks.fileGet(...a),
   },
 }));
 
@@ -154,5 +162,117 @@ describe("detail actions across prev/next", () => {
 
     expect(t.actions().pendingThumbSec).toBeUndefined();
     expect(t.actions().pending.mainThumb).toBe(false);
+  });
+});
+
+describe("bookmark edits reach the list rows", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const listRow = () =>
+    ({ id: 1, workspaceId: WS, bookmarkSecs: [30] }) as unknown as FileRow;
+
+  it("adds and removes the bookmark's seconds on the cached search rows", async () => {
+    const t = setup();
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      bookmarks: [{ id: 9, sec: 30, createdAt: 0 }],
+    });
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [{ items: [listRow()], nextCursor: null }],
+      pageParams: [0],
+    });
+    const rowSecs = () =>
+      t.qc.getQueryData<{ pages: { items: FileRow[] }[] }>([
+        "files_search",
+        "k",
+      ])?.pages[0].items[0].bookmarkSecs;
+
+    mocks.bookmarkAdd.mockResolvedValue({ id: 10, sec: 5, createdAt: 0 });
+    act(() => t.actions().addBookmark(5));
+    await waitFor(() => expect(rowSecs()).toEqual([5, 30]));
+
+    mocks.bookmarkRemove.mockResolvedValue(undefined);
+    act(() => t.actions().removeBookmark(9));
+    await waitFor(() => expect(rowSecs()).toEqual([5]));
+  });
+
+  it("reaches the other copies of the same content too", async () => {
+    const t = setup();
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      contentHash: "same",
+      bookmarks: [],
+    });
+    const rows = [
+      { id: 1, workspaceId: WS, contentHash: "same", bookmarkSecs: [] },
+      // A copy in another workspace: bookmarks follow the content.
+      { id: 7, workspaceId: "ws-other", contentHash: "same", bookmarkSecs: [] },
+      { id: 8, workspaceId: WS, contentHash: "different", bookmarkSecs: [] },
+    ] as unknown as FileRow[];
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [{ items: rows, nextCursor: null }],
+      pageParams: [0],
+    });
+    const secs = () =>
+      t.qc
+        .getQueryData<{ pages: { items: FileRow[] }[] }>(["files_search", "k"])
+        ?.pages[0].items.map((r) => r.bookmarkSecs);
+
+    mocks.bookmarkAdd.mockResolvedValue({ id: 10, sec: 5, createdAt: 0 });
+    act(() => t.actions().addBookmark(5));
+    await waitFor(() => expect(secs()).toEqual([[5], [5], []]));
+  });
+
+  it("a tag added on one copy shows in the other copy's detail and row (#716)", async () => {
+    const t = setup();
+    const tag = {
+      id: 3,
+      name: "beach",
+      namespace: "",
+      source: "manual",
+      score: null,
+    };
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      contentHash: "same",
+      tags: [],
+      bookmarks: [],
+    });
+    t.qc.setQueryData(["file_get", "ws-other", 7], {
+      id: 7,
+      contentHash: "same",
+      tags: [],
+      bookmarks: [],
+    });
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [
+        {
+          items: [
+            { id: 1, workspaceId: WS, contentHash: "same", tags: [] },
+            { id: 7, workspaceId: "ws-other", contentHash: "same", tags: [] },
+          ],
+          nextCursor: null,
+        },
+      ],
+      pageParams: [0],
+    });
+    mocks.fileAddTag.mockResolvedValue(undefined);
+    mocks.fileGet.mockResolvedValue({
+      id: 1,
+      contentHash: "same",
+      tags: [tag],
+      bookmarks: [],
+    });
+    act(() => t.actions().addTag("beach"));
+    await waitFor(() =>
+      expect(
+        t.qc.getQueryData<FileDetail>(["file_get", "ws-other", 7])?.tags,
+      ).toEqual([tag]),
+    );
+    expect(
+      t.qc
+        .getQueryData<{ pages: { items: FileRow[] }[] }>(["files_search", "k"])
+        ?.pages[0].items.map((r) => r.tags?.length),
+    ).toEqual([1, 1]);
   });
 });

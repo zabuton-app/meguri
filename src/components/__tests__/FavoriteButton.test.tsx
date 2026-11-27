@@ -37,7 +37,9 @@ function setup(favorite: number) {
     { wrapper },
   );
   const rerenderWith = (fav: number) =>
-    view.rerender(<FavoriteButton fileId={1} workspaceId="ws" favorite={fav} />);
+    view.rerender(
+      <FavoriteButton fileId={1} workspaceId="ws" favorite={fav} />,
+    );
   return { qc, rerenderWith };
 }
 
@@ -126,14 +128,15 @@ describe("FavoriteButton", () => {
   });
 
   it("suppresses all decorative effects under prefers-reduced-motion while still mutating", async () => {
-    const orig = window.matchMedia;
-    window.matchMedia = ((query: string) =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
     try {
       setup(0);
 
@@ -147,7 +150,7 @@ describe("FavoriteButton", () => {
         expect(fileSetFavorite).toHaveBeenCalledWith(1, "ws", true),
       );
     } finally {
-      window.matchMedia = orig;
+      matchMedia.mockRestore();
     }
   });
 

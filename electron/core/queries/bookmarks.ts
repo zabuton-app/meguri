@@ -3,7 +3,7 @@
 import type { DB } from "../db.js";
 import { nowUnix } from "../db.js";
 import { metaKeyOf } from "../tags.js";
-import type { SceneBookmark } from "../types.js";
+import type { FileRow, SceneBookmark } from "../types.js";
 
 // Treat two bookmarks within this many seconds as the same instant. Used to dedupe
 // "Add bookmark" presses near an existing mark. Mirrors BOOKMARK_NEAR_EPS in
@@ -74,4 +74,20 @@ export function removeBookmark(
     bookmarkId,
     metaKey,
   );
+}
+
+/** Set each row's bookmarkSecs (ascending; [] when it has none) in one query. */
+export function attachBookmarkSecs(db: DB, items: FileRow[]): void {
+  if (items.length === 0) return;
+  for (const it of items) it.bookmarkSecs = [];
+  const byId = new Map(items.map((it) => [it.id, it]));
+  const ph = items.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT f.id AS fileId, b.sec FROM files f
+       JOIN scene_bookmarks b ON b.meta_key = f.meta_key
+       WHERE f.id IN (${ph}) ORDER BY b.sec, b.id`,
+    )
+    .all(...items.map((i) => i.id)) as { fileId: number; sec: number }[];
+  for (const r of rows) byId.get(r.fileId)?.bookmarkSecs?.push(r.sec);
 }

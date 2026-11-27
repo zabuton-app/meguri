@@ -11,13 +11,20 @@ vi.mock("electron-log/renderer", () => ({
   },
 }));
 
+// The preload hands down the app's name, which locale strings interpolate as
+// {app}, and its one-character mark. Mocked here rather than through window.api, which stays undefined so
+// the IPC client keeps its no-preload fallback.
+vi.mock("@/lib/appName", () => ({
+  appName: vi.fn(() => "Meguri"),
+  appGlyph: vi.fn(() => "巡"),
+}));
+
 class ResizeObserverStub {
   observe() {}
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver =
-  ResizeObserverStub as unknown as typeof ResizeObserver;
+globalThis.ResizeObserver = ResizeObserverStub;
 
 if (typeof HTMLElement !== "undefined" && !HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = vi.fn();

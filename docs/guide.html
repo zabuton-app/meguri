@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meguri User Guide</title>
-<meta name="description" content="How to use Meguri: add folders, browse, search, tag, and play your local videos and photos — all offline.">
+<meta name="description" content="How to use Meguri: add folders, browse, search, tag, and play your local videos, photos, and audio — all offline.">
 <link rel="icon" href="./assets/icon.png">
 <style>
   /* Solarized light, regardless of the OS color scheme */
@@ -70,7 +70,7 @@
     <a href="./index.html"><img class="logo" src="./assets/icon.png" alt="Meguri logo"></a>
     <h1>Meguri User Guide</h1>
     <p class="tagline">Everything you need to browse, search, and rediscover
-    your local videos and photos.</p>
+    your local videos, photos, and audio.</p>
     <nav class="top">
       <a href="./index.html">← Download page</a> ·
       <a href="https://github.com/zabuton-app/meguri">GitHub</a> ·
@@ -89,6 +89,7 @@
     <li><a href="#tags">Tags, ratings, and favorites</a></li>
     <li><a href="#auto-tag">Auto tagging</a></li>
     <li><a href="#bulk-edit">Editing several files at once</a></li>
+    <li><a href="#compare">Comparing two images</a></li>
     <li><a href="#timeline">Timeline view</a></li>
     <li><a href="#graph">Graph view</a></li>
     <li><a href="#collections">Collections</a></li>
@@ -97,6 +98,7 @@
     <li><a href="#bookmarks">Scene bookmarks and history</a></li>
     <li><a href="#pet">The pet</a></li>
     <li><a href="#workspaces">Workspaces</a></li>
+    <li><a href="#scan-exclusions">Keeping files and folders out of scans</a></li>
     <li><a href="#tray">The tray icon and quitting</a></li>
     <li><a href="#appearance">Themes, language, and zoom</a></li>
     <li><a href="#data">Where your data lives</a></li>
@@ -190,7 +192,9 @@
     (<kbd>Alt</kbd>+<kbd>↑</kbd>), and the menu on the current folder's name
     jumps straight to one of its subfolders.</li>
     <li><strong>Open in file manager</strong> and <strong>Copy path</strong>
-    act on the folder you are in.</li>
+    act on the folder you are in. To use them on a folder without opening
+    it, right-click the folder: its menu has <strong>Open</strong>,
+    <strong>Open in file manager</strong> and <strong>Copy path</strong>.</li>
     <li>Search and filters apply inside the current folder. Below the top
     level, the folder shows up as a badge among the search conditions.</li>
     <li>The play button plays the whole folder, subfolders included — see
@@ -220,12 +224,38 @@
     <li><strong>Photos</strong> are shown full size. A <strong>Copy
     image</strong> button puts the picture on your clipboard, ready to paste
     into a chat or document.</li>
+    <li>To look at a photo's details, <strong>zoom</strong> into it:
+    <kbd>Ctrl</kbd> + mouse wheel over the photo zooms toward the pointer,
+    and the buttons at its lower right zoom in, zoom out, and fit it back to
+    the view. Double-click to switch between fit and actual size. Zoomed in,
+    the photo fills its whole area, the bars beside it included; drag it to
+    move around. The next file opens at fit.</li>
+    <li><strong>Videos</strong> zoom the same way with <kbd>Ctrl</kbd> +
+    mouse wheel, or with the zoom buttons in the playback bar. Zoomed in,
+    drag the picture to move around; a click without dragging still plays or
+    pauses. Entering or leaving fullscreen, or opening the next file, goes
+    back to fit.</li>
     <li>If a file uses a codec the built-in player can't handle, use
     <strong>Open externally</strong> to hand it to your system's default
     player.</li>
   </ul>
   <p>The detail view is also where you edit a file's tags and rating, mark it
   as a favorite, and add scene bookmarks.</p>
+  <p>For SDR video, open <strong>Video adjustments</strong> at the upper right
+  of the detail player. During playback, move the pointer over the player to
+  show the button and playback bar. Both are visible while paused. Exposure
+  is measured in stops and rolls highlights toward white. Contrast shapes a
+  smooth curve around the adjustable pivot.
+  The graph shows the combined exposure and contrast response. Use subtractive
+  saturation, temperature, and tint to adjust the color.</p>
+  <p>Video adjustments opens a panel beside the player. In its
+  <strong>Color</strong> section, use <strong>On / Off</strong> to compare the
+  whole adjustment. Hold an individual control name to preview its neutral
+  value, or focus the name and hold Space or Enter. Double-click a slider to
+  reset just that control.
+  <strong>Reset all</strong> returns the settings to neutral. Adjustments
+  affect only this visit to the detail player. Source files, exported stills,
+  and saved thumbnails are unaffected.</p>
 
   <h2 id="audio">Listening to audio</h2>
   <img class="shot" src="./assets/audio.png" alt="A track playing in the bottom player bar while the library is browsed above it">
@@ -256,7 +286,10 @@
   <img class="shot" src="./assets/spectrum-patterns.png" alt="A contact sheet of the twelve spectrum patterns">
 
   <h2 id="search">Search and filters</h2>
-  <p>The search bar at the top filters your whole library. You can combine:</p>
+  <p>The search bar in the middle of the title bar filters your whole library.
+  Click it, or press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd>, and the
+  command menu opens over it with the current search in its field; edit it
+  there and press Enter. You can combine:</p>
   <ul>
     <li><strong>Text search</strong> — matches file names, paths, and tags
     (full-text search, so partial words work). Words separated by spaces must
@@ -293,9 +326,14 @@
   automatically after the next scan.</p>
   <p>Tags are shared across workspaces by name. Letter case, extra spaces and
   invisible characters do not matter when you search or tag, so
-  <code>Trip</code> and <code>trip</code> are one tag. Typing
-  <code>tag:</code> in the search box suggests tags from every workspace, the
-  ones in the current view first.</p>
+  <code>Trip</code> and <code>trip</code> are one tag. Typing a word in the
+  search lists the tags from every workspace whose names contain it, the
+  ones in the current view first, below a first row that searches for what you
+  typed. That row is highlighted to begin with, so Enter searches as usual;
+  pick a tag with the arrow keys and Enter, or click it, and the word becomes
+  that tag's condition, with the menu still open to type more. Typing
+  <code>tag:</code> lists the tags directly. Backspace at the start of the
+  field steps back onto the conditions; press it again to remove one.</p>
   <p>The <strong>Tags</strong> screen (the tag button in the header) lists
   every tag with how many files carry it. Rename, merge, or delete tags there.
   The change applies to the workspaces in view — every workspace in the
@@ -363,6 +401,46 @@
   </ul>
   <p>One edit covers up to 5,000 files. The × at the end of the bar leaves
   selection mode.</p>
+
+  <h2 id="compare">Comparing two images</h2>
+  <p>This feature is experimental, marked with a beaker: it may change or be
+  removed in a later version.</p>
+  <p>Select exactly two images and click <strong>Compare</strong> in the
+  selection bar to see what differs between them: an edited copy, a
+  re-export, two shots in a row. The first image you selected is
+  <strong>A</strong>, the second <strong>B</strong>;
+  <strong>Swap A and B</strong> (<kbd>S</kbd>) turns them around.</p>
+  <p>Meguri looks for where B sits in A, so a cropped or shifted copy lines up
+  instead of showing as changed everywhere. It goes by the outlines in the
+  pictures, so a copy that is brighter, darker or in another theme still
+  lines up, and by distinctive points it finds in both, so a large shift does
+  too. A copy at another size (a thumbnail, an enlarged crop, up to four
+  times either way) is drawn at the size that lines it up, and the bottom
+  right shows the scale; it cannot be rotated. The bottom right shows the offset
+  it found and how well the two match as a percentage. The match compares
+  the outlines only, not the colours: it says how well the shapes line up,
+  not whether the pixels are the same. A low match is flagged
+  and the view opens with <strong>Align</strong> off, both images laid at the
+  top-left corner: the images may not be the same picture, or one may be
+  rotated, which the search does not handle. <strong>Align</strong>
+  turns the offset on or off either way.</p>
+  <p>The views compare the two where they overlap. What lies outside the
+  overlap, in either image, is shown dimmed.</p>
+  <p>Four ways to look at the pair (<kbd>1</kbd>–<kbd>4</kbd>):</p>
+  <ul>
+    <li><strong>Slider</strong>: A on the left of the handle, B on the right.
+    Drag the handle to move the split.</li>
+    <li><strong>Difference</strong>: pixels that are the same turn black, so
+    only the changes show.</li>
+    <li><strong>Onion skin</strong>: B over A, at the opacity the slider in
+    the toolbar sets.</li>
+    <li><strong>Blink</strong>: A and B take turns. With reduced motion on,
+    press <kbd>Space</kbd> to switch.</li>
+  </ul>
+  <p>Scroll to zoom and drag to pan; both images move together. <kbd>0</kbd>
+  or a double-click fits the pair back in the window, and <kbd>Esc</kbd>
+  closes the view. The button beside the close button shrinks the view to a
+  centred panel and back, as in Discover. Videos cannot be compared.</p>
 
   <h2 id="timeline">Timeline view</h2>
   <p>The third layout in the header lays your library out <strong>by
@@ -561,6 +639,91 @@
     recognized by content so their metadata is preserved.</li>
   </ul>
 
+  <h2 id="scan-exclusions">Keeping files and folders out of scans</h2>
+  <p>Some folders are not worth listing: thumbnail caches a NAS writes,
+  proxies, private folders. Excluding them hides their files from the
+  library at once and leaves them out of every later scan. Nothing is
+  deleted from your disk, and if you take an exclusion away, the files come
+  back at the next scan with their tags, ratings and history.</p>
+  <p>There are two ways to exclude something.</p>
+  <h3>A folder, in one workspace</h3>
+  <img class="shot" src="./assets/scan-exclusions-confirm.png" alt="The confirmation for excluding the cache folder, showing where it is on disk and that its three files will be hidden">
+  <ul>
+    <li>In the folder view, right-click a folder and choose <strong>Exclude
+    from scans</strong>. Meguri shows where the folder is on disk and how
+    many files it will hide before it asks you to confirm.</li>
+    <li>Or click the pencil beside the workspace's folder in the header
+    (<strong>Edit workspace</strong>) and use <strong>Add folder</strong>
+    under <strong>Excluded from scans</strong>, which opens your system's
+    folder picker.</li>
+    <li>Only that folder is excluded. A folder with the same name somewhere
+    else is still scanned.</li>
+    <li>To include it again, open <strong>Edit workspace</strong> and click
+    <strong>Include</strong> next to it. The change, like an added folder,
+    takes effect when you click <strong>Save</strong>; until then
+    <strong>Undo</strong> takes it back.</li>
+  </ul>
+  <img class="shot" src="./assets/scan-exclusions-workspace.png" alt="The Edit workspace dialog listing two excluded folders, one marked to be included again on save">
+  <h3>A pattern, in every workspace</h3>
+  <p>Patterns live in <strong>Settings → Scan</strong>, under
+  <strong>Exclude by pattern</strong> (marked <strong>Global</strong>), and
+  apply to every workspace. Pick how a pattern is written, then type it:</p>
+  <img class="shot" src="./assets/scan-exclusions-patterns.png" alt="Settings, Scan tab: the name pattern private being typed, with the two files it would hide listed below">
+  <table>
+    <tr><th>Kind</th><th>Example</th><th>What it excludes</th></tr>
+    <tr>
+      <td><strong>Name</strong> (the default)</td>
+      <td><code>private</code>, <code>*.tmp</code>, <code>Thumbs.db</code></td>
+      <td>Files and folders with that name, at any depth. A folder takes
+      everything inside it. <code>*</code> stands for any text within a
+      name; every other character, such as <code>.</code> or
+      <code>(</code>, means itself.</td>
+    </tr>
+    <tr>
+      <td>Name with a <code>/</code></td>
+      <td><code>work/private</code>, <code>/private</code></td>
+      <td>That path, counted from the workspace folder. <code>/private</code>
+      is only the <code>private</code> folder at the top, not one deeper
+      down.</td>
+    </tr>
+    <tr>
+      <td>Name ending in <code>/</code></td>
+      <td><code>private/</code></td>
+      <td>Folders with that name only, not files.</td>
+    </tr>
+    <tr>
+      <td><strong>Contains</strong></td>
+      <td><code>temp</code></td>
+      <td>Anything whose path contains the text, even in the middle of a
+      name: <code>temp</code> also excludes <code>attempt.mp4</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Regex</strong></td>
+      <td><code>(^|/)private/</code></td>
+      <td>A regular expression, for when the others are not enough. It is
+      matched against the path from the workspace folder, where a folder's
+      path ends with <code>/</code>.</td>
+    </tr>
+  </table>
+  <ul>
+    <li>Letter case does not matter: <code>private</code> also excludes
+    <code>Private</code>.</li>
+    <li>While you type, Meguri lists the files the pattern would hide, so
+    you can check it before you click <strong>Add</strong>. Nothing changes
+    until you click <strong>Save</strong>. A pattern that takes too long to
+    run cannot be added, since it would stop every scan.</li>
+    <li>The buttons under the field fill in common exclusions:
+    <strong>Synology @eaDir</strong> (the thumbnail folders a Synology NAS
+    writes everywhere), <strong>#recycle</strong> (the recycle bin folder on
+    some NAS shares), <strong>.DS_Store</strong> (the files macOS leaves in
+    every folder it opens) and <strong>Thumbs.db</strong> (the thumbnail
+    caches Windows writes).</li>
+    <li>To stop excluding something, delete its pattern and save.</li>
+  </ul>
+  <p>Below the patterns, <strong>Exclude by folder</strong> lists each
+  workspace with how many folders it excludes; <strong>Manage</strong>
+  opens that workspace's list.</p>
+
   <h2 id="tray">The tray icon and quitting</h2>
   <p>Meguri lives in your system tray. <strong>Closing the window hides it to
   the tray instead of quitting</strong> — the app keeps running so it can
@@ -591,7 +754,8 @@
     Español, Français, 한국어, and 简体中文. Switch in Settings.</li>
     <li><strong>Zoom</strong> — <kbd>Ctrl</kbd> + mouse wheel or
     <kbd>Ctrl</kbd> + <kbd>+</kbd>/<kbd>-</kbd> to scale the UI;
-    <kbd>Ctrl</kbd> + <kbd>0</kbd> resets.</li>
+    <kbd>Ctrl</kbd> + <kbd>0</kbd> resets. Over a photo or a video in the
+    detail view, <kbd>Ctrl</kbd> + mouse wheel zooms it instead.</li>
   </ul>
 
   <img class="shot" src="./assets/css-theme-cyberpunk-dark.png" alt="Meguri with the Cyberpunk sample CSS theme, dark variant">
@@ -602,17 +766,20 @@
   (locations shown for Linux; on Windows it's under <code>%APPDATA%</code>,
   on macOS under <code>~/Library/Application Support</code>):</p>
   <ul>
-    <li><code>~/.config/Meguri/config.json</code> — your registered
-    workspaces and settings.</li>
+    <li><code>~/.config/Meguri/library.sqlite</code> — your registered
+    workspaces and settings, and the metadata every workspace shares.</li>
     <li><code>~/.config/Meguri/roots/&lt;id&gt;/db.sqlite</code> — the library
     database for one workspace (tags, ratings, history, metadata).</li>
     <li><code>~/.config/Meguri/roots/&lt;id&gt;/thumbs/</code> — generated
     thumbnails.</li>
   </ul>
-  <p><strong>Privacy:</strong> Meguri never connects to the internet. There is
-  no telemetry, no analytics, and no account. All features work fully
-  offline; the only network activity is a local server on your own machine
-  that streams your files to the app window.</p>
+  <p><strong>Privacy:</strong> Meguri works offline, and your media and
+  library data stay on your device. There is no telemetry, no analytics, and
+  no account. The only request to the internet is the update check, which
+  asks GitHub for the latest release; to turn off automatic checks, open
+  <strong>Settings → App → Updates</strong> and turn off
+  <strong>Check automatically</strong>. Your files are streamed to the app
+  window by a local server on your own machine.</p>
   <div class="card">
     <strong>Note:</strong> tags, ratings, and history stored in the database
     may be lost when Meguri's internal data format changes between versions.

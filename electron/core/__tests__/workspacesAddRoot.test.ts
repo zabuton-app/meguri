@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// workspaces.ts reads/writes <userData>/config.json via appConfig.ts; point that
+// workspaces.ts reads/writes its settings under <userData> via appConfig.ts; point that
 // at a throwaway directory so each test gets a pristine config.
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
@@ -17,6 +17,7 @@ const { insertFile, LEGACY_METADATA_DDL } = await import("./helpers.js");
 const { openDb } = await import("../db.js");
 const paths = await import("../paths.js");
 const { Core } = await import("../index.js");
+const { redactString } = await import("../logger.js");
 
 let root = "";
 
@@ -42,6 +43,14 @@ describe("Workspaces.addRoot", () => {
     const first = ws.addRoot(root);
     expect(ws.addRoot(root)).toEqual({ path: first.path, added: false });
     expect(ws.list().filter((w) => w.path === first.path)).toHaveLength(1);
+  });
+
+  it("has the logger redact paths under the new root", () => {
+    const ws = new Workspaces();
+    const { path: p } = ws.addRoot(root);
+    expect(redactString(path.join(p, "My Clips", "a b.mp4"))).toBe(
+      "<media-path>",
+    );
   });
 
   it("keeps add() returning the stored path", () => {
@@ -150,7 +159,7 @@ describe("Workspaces persistence", () => {
   // Settings written through updateConfig() after the Workspaces snapshot was
   // taken must survive a workspace write (regression: switching workspaces
   // reverted custom CSS, the CSS theme and the logo to their startup values).
-  it("keeps settings it does not own when it writes config.json", async () => {
+  it("keeps settings it does not own when it writes its own", async () => {
     const { loadConfig, updateConfig } = await import("../appConfig.js");
     const ws = new Workspaces();
     updateConfig((c) => ({

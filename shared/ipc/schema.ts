@@ -27,6 +27,7 @@ import {
 } from "../autoTag.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import { MAX_EXCLUSION_PATTERN, PATTERN_KINDS } from "../scanExclusions.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
 import { ACTIVITY_METRICS } from "./activity.js";
 import { TIMELINE_AXES } from "./timeline.js";
@@ -38,8 +39,8 @@ export type Kind = z.infer<typeof KindSchema>;
 // App logo variants (window/tray/in-app icon). "dark" is the original
 // vermilion kanji icon, "light" the inverted unbleached-cotton one, and
 // "enso" a pictorial brush-circle-with-media-card mark on navy. Persisted in
-// main's config.json (the tray exists before any renderer), so the ids are a
-// stable API shared by config.json, IPC, and the bundled assets — do not
+// main's settings (the tray exists before any renderer), so the ids are a
+// stable API shared by the stored settings, IPC, and the bundled assets — do not
 // rename.
 export const LOGO_IDS = ["dark", "light", "enso"] as const;
 export const LogoIdSchema = z.enum(LOGO_IDS);
@@ -104,6 +105,11 @@ export const FileRowSchema = z.object({
   progress: z.number().nullable(),
   /** Tags attached to search results (for grid display). For detail fetches, use FileDetail.tags. */
   tags: z.array(TagInfoSchema).optional(),
+  codec: z.string().nullable().optional(),
+  fps: z.number().nullable().optional(),
+  /** Scene bookmark positions in seconds, ascending (for the filmstrip). Named
+   *  apart from FileDetail.bookmarks, which carries the full rows. */
+  bookmarkSecs: z.array(z.number()).optional(),
 });
 export type FileRow = z.infer<typeof FileRowSchema>;
 
@@ -173,47 +179,111 @@ export const SearchCursorSchema = z.object({
 });
 export type SearchCursor = z.infer<typeof SearchCursorSchema>;
 
-export const SearchQuerySchema = z.object({
-  q: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  tagSource: z.string().optional(),
-  kind: z.string().optional(),
-  ratingMin: z.number().optional(),
-  favorite: z.boolean().optional(),
-  /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
-  duplicates: z.boolean().optional(),
-  played: z.boolean().optional(),
-  /** Only files left part-way through (a resume point is stored). */
-  inProgress: z.boolean().optional(),
-  playedVia: z.string().optional(),
-  capturedFrom: z.number().optional(),
-  capturedTo: z.number().optional(),
-  /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
-  btimeFrom: z.number().optional(),
-  btimeTo: z.number().optional(),
-  /** Range of the time the file entered the index (created_at), Unix seconds. */
-  addedFrom: z.number().optional(),
-  addedTo: z.number().optional(),
-  /** Played-at range, Unix seconds: files with a play history row inside it. */
-  playedFrom: z.number().optional(),
-  playedTo: z.number().optional(),
-  sort: z.string().optional(),
-  sortDir: z.enum(["asc", "desc"]).optional(),
-  /** Folder view: only files under this folder (see FolderScopeSchema). */
-  folder: FolderScopeSchema.optional(),
-  fileIds: z.array(z.number()).optional(),
-  // Number = plain offset (legacy / backward paging); object = keyset cursor.
-  cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
-  // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
-  // absurd values at the IPC boundary and double-guards the multi-core cross-
-  // workspace path, where the per-core clamp doesn't bound the merged slice.
-  limit: z.number().int().min(1).max(500).optional(),
-});
+/**
+ * Queries stored before the kind filter took several kinds (smart collections,
+ * recent searches) carry `kind: "video"`. Read that as `kinds: ["video"]` so
+ * they keep their condition instead of quietly losing it to key stripping.
+ * It is for stored data only; nothing sends `kind` over IPC any more.
+ */
+function liftLegacyKind(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || !("kind" in value))
+    return value;
+  const { kind, ...rest } = value as Record<string, unknown>;
+  const hasKinds = Array.isArray(rest.kinds) && rest.kinds.length > 0;
+  if (typeof kind === "string" && kind !== "" && !hasKinds)
+    return { ...rest, kinds: [kind] };
+  return rest;
+}
+
+export const SearchQuerySchema = z.preprocess(
+  liftLegacyKind,
+  z.object({
+    q: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    tagSource: z.string().optional(),
+    /** Any of these kinds; absent or empty means every kind. */
+    // Plain strings, so a kind from a newer build survives; capped because
+    // the query binds one placeholder per kind.
+    kinds: z.array(z.string().max(32)).max(16).optional(),
+    ratingMin: z.number().optional(),
+    favorite: z.boolean().optional(),
+    /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
+    duplicates: z.boolean().optional(),
+    /** Only videos with an embedded text subtitle track the player can show. */
+    subtitles: z.boolean().optional(),
+    played: z.boolean().optional(),
+    /** Only files left part-way through (a resume point is stored). */
+    inProgress: z.boolean().optional(),
+    playedVia: z.string().optional(),
+    capturedFrom: z.number().optional(),
+    capturedTo: z.number().optional(),
+    /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
+    btimeFrom: z.number().optional(),
+    btimeTo: z.number().optional(),
+    /** Range of the time the file entered the index (created_at), Unix seconds. */
+    addedFrom: z.number().optional(),
+    addedTo: z.number().optional(),
+    /** Played-at range, Unix seconds: files with a play history row inside it. */
+    playedFrom: z.number().optional(),
+    playedTo: z.number().optional(),
+    sort: z.string().optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
+    /** Folder view: only files under this folder (see FolderScopeSchema). */
+    folder: FolderScopeSchema.optional(),
+    fileIds: z.array(z.number()).optional(),
+    // Number = plain offset (legacy / backward paging); object = keyset cursor.
+    cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
+    // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
+    // absurd values at the IPC boundary and double-guards the multi-core cross-
+    // workspace path, where the per-core clamp doesn't bound the merged slice.
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+);
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
+
+/**
+ * A saved search (smart collection), stored in the library's
+ * `smart_collections` table (electron/core/smartCollectionStore.ts).
+ */
+export const SmartCollectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  query: SearchQuerySchema,
+  /**
+   * The workspace `query.folder` lies in. A folder path means nothing outside
+   * its own workspace, so it is saved only together with one.
+   */
+  workspaceId: z.string().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type SmartCollection = z.infer<typeof SmartCollectionSchema>;
+
+/** The saved searches, newest first, and the one the list opens with. */
+export interface StoredSmartCollections {
+  collections: SmartCollection[];
+  defaultId: string | null;
+}
+
+/**
+ * Keyset cursor of the play-history timeline: the last row of the page it
+ * follows, in the timeline's order (played_at DESC, id DESC, then workspace).
+ * Each workspace seeks straight past it instead of re-reading from the start.
+ */
+export const HistoryCursorSchema = z.object({
+  /** playedAt of the last row. */
+  at: z.number(),
+  /** historyId of the last row. */
+  id: z.number().int(),
+  /** workspaceId of the last row (breaks ties between workspaces). */
+  ws: z.string(),
+});
+export type HistoryCursor = z.infer<typeof HistoryCursorSchema>;
 
 export const HistoryQuerySchema = z.object({
   via: z.enum(["browser", "external"]).optional(),
-  cursor: z.number().int().min(0).optional(),
+  // Number = offset over collapsed rows (the first page is 0); object = keyset.
+  cursor: z.union([z.number().int().min(0), HistoryCursorSchema]).optional(),
   limit: z.number().int().min(1).max(500).optional(),
 });
 export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
@@ -233,9 +303,28 @@ export type HistoryEntryRow = z.infer<typeof HistoryEntrySchema>;
 
 export const HistoryPageSchema = z.object({
   items: z.array(HistoryEntrySchema),
-  nextCursor: z.number().nullable(),
+  nextCursor: HistoryCursorSchema.nullable(),
 });
 export type HistoryPage = z.infer<typeof HistoryPageSchema>;
+
+/** A file the last scan of its workspace did not find on disk (#277). */
+export const MissingFileSchema = FileRowSchema.extend({
+  /** When the scan found the file gone (Unix seconds). */
+  deletedAt: z.number(),
+});
+export type MissingFileRow = z.infer<typeof MissingFileSchema>;
+
+export const MissingFilesResultSchema = z.object({
+  /** The most recently gone first, at most MAX_BULK_FILES of them, so that
+   *  selecting all of them is one removal. */
+  items: z.array(MissingFileSchema),
+  /** All missing files of the workspaces listed. */
+  total: z.number(),
+  /** Some workspace in scope is being scanned and was left out: mid-scan,
+   *  and through a whole rebuild, its files on disk read as missing. */
+  scanning: z.boolean(),
+});
+export type MissingFilesResult = z.infer<typeof MissingFilesResultSchema>;
 
 /** Files sharing the same (content_hash, size) pair — treated as identical content. */
 export const DuplicateGroupSchema = z.object({
@@ -427,7 +516,7 @@ export const LibraryMergeEventSchema = z.discriminatedUnion("state", [
 ]);
 export type LibraryMergeEvent = z.infer<typeof LibraryMergeEventSchema>;
 
-/** What went wrong reading config.json at startup (see appConfig.ts). */
+/** What went wrong reading the settings at startup (see appConfig.ts). */
 export const ConfigProblemSchema = z.enum(["moved-aside", "unreadable"]);
 export type ConfigProblem = z.infer<typeof ConfigProblemSchema>;
 
@@ -441,6 +530,9 @@ export const AppStatusSchema = z.object({
   workspaceId: z.string().nullable(),
   /** True while running unpackaged for local development. */
   devMode: z.boolean(),
+  /** How many ffmpeg decodes the media server runs at once (frame grabs,
+   *  waveforms), so the filmstrip can size its own queue to it. */
+  decodeSlots: z.number().optional(),
   /** Present while workspaces are being merged into the shared library (the
    *  first launch after the upgrade): how many of them are done. */
   libraryMerge: LibraryMergeProgressSchema.optional(),
@@ -449,9 +541,10 @@ export const AppStatusSchema = z.object({
   /** Set when the library was found damaged at startup and restored from
    *  its backup copy: when that copy was taken (Unix seconds). */
   libraryRestoredFrom: z.number().optional(),
-  /** Set when config.json could not be used at startup: "moved-aside" when it
-   *  could not be parsed and was renamed to config.json.corrupt-<time>,
-   *  "unreadable" when it could not be read and is not written over. */
+  /** Set when the settings could not be used at startup: "moved-aside" when
+   *  config.json, being imported, could not be parsed and was renamed to
+   *  config.json.corrupt-<time>; "unreadable" when the library or config.json
+   *  could not be read, and no setting is written until the next launch. */
   configProblem: ConfigProblemSchema.optional(),
 });
 export type AppStatus = z.infer<typeof AppStatusSchema>;
@@ -529,8 +622,9 @@ export const ScanDoneSchema = z.object({
   error: z.boolean().optional(),
   /** Why the scan failed, when it is a known case: "root-unreadable" when
    *  the workspace's folder could not be read (an unplugged drive, a share
-   *  that is down). */
-  errorReason: z.enum(["root-unreadable"]).optional(),
+   *  that is down); "exclusion-stuck" when a scan exclusion pattern did not
+   *  finish, so nothing was scanned (#282). */
+  errorReason: z.enum(["root-unreadable", "exclusion-stuck"]).optional(),
   /** The workspace scanned (absent for a scan not tied to one). */
   workspaceId: z.string().optional(),
 });
@@ -553,7 +647,8 @@ export const UpdateInfoSchema = z.object({
   available: z.boolean(),
   /**
    * Where the "View" action should send the user: the GitHub release page, or
-   * the MS Store product deep link (`ms-windows-store://`) on Store installs.
+   * the MS Store product deep link (`ms-windows-store://`) on Store installs
+   * of an app that has a Store product ID.
    */
   url: z.url(),
   /** Release name/title, when present. */
@@ -562,6 +657,27 @@ export const UpdateInfoSchema = z.object({
   publishedAt: z.string().nullable().optional(),
 });
 export type UpdateInfo = z.infer<typeof UpdateInfoSchema>;
+
+// --- Crash reports (#544) ---
+
+/** A crash report kept from an earlier run (electron/core/crashReports.ts). */
+export const CrashReportSchema = z.object({
+  id: z.string(),
+  /** When the next launch found it (Unix ms). */
+  detectedAt: z.number(),
+  /** "crashed": a process crashed. "unclean-exit": the run ended without a
+   *  clean exit and without a crash dump (forced quit, power loss). */
+  kind: z.enum(["crashed", "unclean-exit"]),
+  /** The report, as the user copies it. */
+  text: z.string(),
+  /** A new crash report issue on GitHub, with the version, OS and channel
+   *  filled in (the report itself is pasted). Null for an app without a
+   *  crash report issue form: the report can only be copied. */
+  issueUrl: z.url().nullable(),
+  /** Found at this launch: the window tells the user about it. */
+  isNew: z.boolean(),
+});
+export type CrashReport = z.infer<typeof CrashReportSchema>;
 
 /** Scope a graph layout is cached under: the active target string (a
  *  workspace id, "__all__" or "collection:<id>"). Main resolves it against the
@@ -574,3 +690,13 @@ export const GraphNodeKeySchema = z.string().min(3).max(GRAPH_NODE_KEY_MAX);
 
 /** The graph view's layout dimensions (the flat view or the 3D one). */
 export const GraphDimsSchema = z.union([z.literal(2), z.literal(3)]);
+
+/**
+ * A scan exclusion pattern (#529): how it is written and what is written.
+ * Main checks that it can be used (patternError in shared/scanExclusions.ts).
+ */
+export const ExclusionPatternSchema = z.object({
+  kind: z.enum(PATTERN_KINDS),
+  value: z.string().min(1).max(MAX_EXCLUSION_PATTERN),
+});
+export type ExclusionPattern = z.infer<typeof ExclusionPatternSchema>;

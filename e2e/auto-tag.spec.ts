@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures/app";
-import { closeTopDialog, fileCard, searchInput } from "./fixtures/helpers";
+import { closeTopDialog, fileCard, searchTrigger } from "./fixtures/helpers";
 
 test.describe("Auto tagging", () => {
   test("opens from the header and closes with Escape", async ({ ready }) => {
@@ -44,9 +44,9 @@ test.describe("Auto tagging", () => {
     await rename.press("Enter");
     const question = ready.getByRole("alertdialog");
     await expect(question.getByText("Move files to “Sample”?")).toBeVisible();
-    await question.getByRole("button", { name: "Replace on 1 files" }).click();
+    await question.getByRole("button", { name: "Replace on 1 file" }).click();
     await expect(
-      ready.getByText("Replaced “Test” with “Sample” on 1 files."),
+      ready.getByText("Replaced “Test” with “Sample” on 1 file."),
     ).toBeVisible();
 
     // The tag is the user's own: the tag screen lists it like any other, and
@@ -69,7 +69,7 @@ test.describe("Auto tagging", () => {
     await dialog.getByRole("button", { name: "Search the library" }).click();
 
     await expect(ready).toHaveURL(/#\/$/);
-    await expect(searchInput(ready)).toHaveValue("Sample|test");
+    await expect(searchTrigger(ready)).toContainText("Sample|test");
     await expect(fileCard(ready)).toBeVisible();
   });
 });

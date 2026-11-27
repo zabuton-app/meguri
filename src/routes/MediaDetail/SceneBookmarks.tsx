@@ -35,8 +35,8 @@ export function SceneBookmarks({
   t: TFunc;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-3">
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase text-muted">
+    <section className="border-t border-border py-3">
+      <h3 className="mb-2 text-xs font-semibold uppercase text-muted">
         {t("media.bookmarks")}
       </h3>
       <ScrollArea className="w-full" viewportClassName="pb-3">
@@ -95,7 +95,7 @@ function BookmarkThumb({
       <button
         type="button"
         onClick={() => onSeek(bookmark.sec)}
-        className={`relative block overflow-hidden rounded-lg border transition hover:border-[var(--c-primary)] ${
+        className={`relative block overflow-hidden rounded-item border transition hover:border-[var(--c-primary)] ${
           isMainThumb ? "border-[var(--c-primary)]" : "border-border"
         }`}
         title={t("scene.seekTo", { time: fmtTime(bookmark.sec) })}
@@ -110,7 +110,7 @@ function BookmarkThumb({
             loaded ? "w-auto opacity-100" : "w-40 opacity-0"
           }`}
         />
-        <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] tabular-nums text-white">
+        <span className="absolute bottom-1 right-1 rounded-item bg-black/75 px-1 text-2xs tabular-nums text-white">
           {fmtTime(bookmark.sec)}
         </span>
       </button>

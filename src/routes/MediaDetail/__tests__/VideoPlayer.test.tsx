@@ -6,9 +6,13 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
+  within,
 } from "@testing-library/react";
 import { StrictMode, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api } from "@/ipc/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
@@ -17,12 +21,15 @@ import {
 } from "@/routes/MediaDetail/VideoPlayer";
 import { announceVideoHandOff, resetVideoHandOff } from "@/video/videoHandOff";
 
+const fileSubtitles = vi.fn<typeof import("@/ipc/client").api.fileSubtitles>();
 const fileRecordPlay = vi.fn().mockResolvedValue(undefined);
 const fileSavePosition = vi
   .fn<(...args: unknown[]) => Promise<void>>()
   .mockResolvedValue(undefined);
 vi.mock("@/ipc/client", () => ({
   api: {
+    fileSubtitles: (...args: Parameters<typeof fileSubtitles>) =>
+      fileSubtitles(...args),
     fileRecordPlay: (...args: unknown[]) => fileRecordPlay(...args),
     fileSavePosition: (...args: unknown[]) => fileSavePosition(...args),
     openExternal: vi.fn().mockResolvedValue(undefined),
@@ -47,10 +54,9 @@ function renderPlayer(
   const onExportFrame = vi.fn();
   const onNativeDuration = vi.fn();
   const onPlayed = vi.fn();
-  const onOpenExternal = vi.fn();
   const t = (key: string) => key;
 
-  const props = {
+  const base = {
     id: 1,
     src: "http://127.0.0.1:17345/ws/ws1/media/1",
     duration: 120,
@@ -68,10 +74,12 @@ function renderPlayer(
     onExportFrame,
     onNativeDuration,
     onPlayed,
-    onOpenExternal,
     t,
-    ...overrides,
-  };
+  } satisfies Parameters<typeof VideoPlayer>[0];
+  // The spread loses the tie between `shortcuts` and `navKeys`; an override
+  // that turns the shortcuts off clears `navKeys` itself. The base above is
+  // still checked whole, so a required prop it lacks does not compile.
+  const props = { ...base, ...overrides } as Parameters<typeof VideoPlayer>[0];
 
   const ref = createRef<PlayerHandle>();
   const view = render(
@@ -85,6 +93,7 @@ function renderPlayer(
     video,
     ref,
     view,
+    props,
     onAddBookmark,
     onRemoveBookmark,
     onExportFrame,
@@ -108,6 +117,19 @@ function loadVideo(video: HTMLVideoElement) {
   fireEvent.loadedMetadata(video);
 }
 
+/** The radios of one column of the audio and subtitles panel, opening the
+ *  panel first. Subtitles: Off, Match audio language, then the text tracks;
+ *  audio: Default, then the tracks. */
+function trackRadios(column: "player.audioTrack" | "player.subtitles") {
+  if (!screen.queryByRole("dialog", { name: "player.audioSubtitles" }))
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+  return within(
+    screen.getByRole("group", { name: column }),
+  ).getAllByRole<HTMLInputElement>("radio");
+}
+
 function fireVideoError(video: HTMLVideoElement, code: number) {
   Object.defineProperty(video, "error", {
     configurable: true,
@@ -116,12 +138,355 @@ function fireVideoError(video: HTMLVideoElement, code: number) {
   fireEvent.error(video);
 }
 
+describe("embedded subtitles", () => {
+  it("shows initial loading but keeps the banner hidden between cue windows", async () => {
+    fileSubtitles.mockReset();
+    let finishFirstWindow: () => void = () => {};
+    let finishNextWindow: () => void = () => {};
+    fileSubtitles
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirstWindow = () => resolve([]);
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishNextWindow = () => resolve([]);
+          }),
+      );
+    const { video } = renderPlayer({
+      duration: 300,
+      subtitleTracks: [{ title: "English", language: "eng", codec: "subrip" }],
+    });
+    loadVideo(video);
+    fireEvent.click(trackRadios("player.subtitles")[2]);
+    expect(await screen.findByText("player.subtitleLoading")).toBeTruthy();
+    finishFirstWindow();
+    await waitFor(() =>
+      expect(screen.queryByText("player.subtitleLoading")).toBeNull(),
+    );
+
+    video.currentTime = 125;
+    fireEvent.timeUpdate(video);
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 0, 120);
+    expect(screen.queryByText("player.subtitleLoading")).toBeNull();
+    await act(async () => finishNextWindow());
+  });
+
+  it("loads the chosen track in the regular player and requests new cues after seeking", async () => {
+    fileSubtitles.mockReset();
+    fileSubtitles.mockImplementation(
+      (_id: number, _ws: string, track: number, start: number) =>
+        Promise.resolve([
+          {
+            start: start + 2,
+            end: start + 10,
+            text: track === 0 ? "Hello" : "Bonjour",
+          },
+        ]),
+    );
+    const { video } = renderPlayer({
+      duration: 300,
+      subtitleTracks: [
+        { title: "English", language: "eng", codec: "subrip" },
+        { title: "French", language: "fra", codec: "subrip" },
+      ],
+    });
+    loadVideo(video);
+    video.currentTime = 5;
+    fireEvent.timeUpdate(video);
+    fireEvent.click(trackRadios("player.subtitles")[2]);
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 0, 0);
+
+    fireEvent.click(trackRadios("player.subtitles")[3]);
+    expect(screen.queryByText("Hello")).toBeNull();
+    expect(await screen.findByText("Bonjour")).toBeTruthy();
+    video.currentTime = 125;
+    fireEvent.timeUpdate(video);
+    expect(await screen.findByText("Bonjour")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 1, 120);
+
+    fireEvent.click(trackRadios("player.subtitles")[0]);
+    expect(screen.queryByText("Bonjour")).toBeNull();
+  });
+
+  it("matches the audio track chosen in the player on Auto", async () => {
+    fileSubtitles.mockReset();
+    fileSubtitles.mockImplementation(
+      (_id: number, _ws: string, track: number, start: number) =>
+        Promise.resolve([
+          {
+            start,
+            end: start + 10,
+            text: track === 0 ? "こんにちは" : "Hello",
+          },
+        ]),
+    );
+    const { video } = renderPlayer({
+      duration: 300,
+      audioTracks: [
+        { title: "", language: "jpn" },
+        { title: "", language: "eng" },
+      ],
+      subtitleAudioLanguage: "jpn",
+      subtitleTracks: [
+        { title: "", language: "jpn", codec: "subrip" },
+        { title: "", language: "eng", codec: "subrip" },
+      ],
+    });
+    loadVideo(video);
+    expect(await screen.findByText("こんにちは")).toBeTruthy();
+
+    fireEvent.click(trackRadios("player.audioTrack")[2]);
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenLastCalledWith(1, "ws1", 1, 0);
+  });
+});
+
+// The captions can be dragged out of the way and put back (#377).
+describe("dragging subtitles", () => {
+  beforeEach(() => {
+    localStorage.removeItem("meguri.subtitlePosition");
+    fileSubtitles.mockReset();
+    fileSubtitles.mockResolvedValue([{ start: 0, end: 60, text: "Hello" }]);
+  });
+
+  // The captions in a 1000 × 400 area, their box 200 × 40 at its bottom middle.
+  async function setup() {
+    const r = renderPlayer({
+      subtitleTracks: [{ title: "English", language: "eng", codec: "subrip" }],
+      subtitleAudioLanguage: "eng",
+    });
+    loadVideo(r.video);
+    const box = await screen.findByText("Hello");
+    const area = box.parentElement as HTMLDivElement;
+    area.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 400 }) as DOMRect;
+    box.getBoundingClientRect = () =>
+      ({ left: 400, top: 360, width: 200, height: 40 }) as DOMRect;
+    box.setPointerCapture = () => {};
+    const play = vi.fn().mockResolvedValue(undefined);
+    r.video.play = play;
+    return { ...r, box, area, play };
+  }
+
+  const at = { pointerId: 1, button: 0, buttons: 1 };
+
+  it("moves them on a drag, kept inside the player, without playing", async () => {
+    const { box, play } = await setup();
+    expect(box.style.left).toBe("50%");
+    expect(box.style.top).toBe("100%");
+
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 100, clientY: 200 });
+    fireEvent.pointerUp(box, { ...at, clientX: 100, clientY: 200 });
+    fireEvent.click(box);
+    // The box's left edge at 0 of 800 px of room, its top at 180 of 360.
+    expect(box.style.left).toBe("0%");
+    expect(box.style.top).toBe("50%");
+    expect(box.style.transform).toBe("translate(0%, -50%)");
+    expect(play).not.toHaveBeenCalled();
+
+    // Past the edge, it stops there.
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 1500, clientY: -500 });
+    fireEvent.pointerUp(box, { ...at, clientX: 1500, clientY: -500 });
+    expect(box.style.left).toBe("100%");
+    expect(box.style.top).toBe("0%");
+    expect(
+      JSON.parse(localStorage.getItem("meguri.subtitlePosition") ?? "null"),
+    ).toEqual({ x: 1, y: 0 });
+  });
+
+  it("captures the pointer from the press on", async () => {
+    const { box } = await setup();
+    const capture = vi.fn();
+    box.setPointerCapture = capture;
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    expect(capture).toHaveBeenCalledWith(1);
+  });
+
+  it("keeps the captions while dragged across the end of the cue", async () => {
+    const { box, video } = await setup();
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 300, clientY: 380 });
+    // The cue ends mid-drag: the box holds the pointer capture, so it stays.
+    video.currentTime = 70;
+    fireEvent.timeUpdate(video);
+    await waitFor(() => expect(box.textContent).toBe(""));
+    expect(box.isConnected).toBe(true);
+
+    fireEvent.pointerUp(box, { ...at, clientX: 300, clientY: 380 });
+    expect(
+      JSON.parse(localStorage.getItem("meguri.subtitlePosition") ?? "null"),
+    ).toEqual({ x: 0.25, y: 1 });
+    await waitFor(() => expect(box.isConnected).toBe(false));
+  });
+
+  it("plays or pauses on a click that hardly moves", async () => {
+    const { box, play } = await setup();
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 502, clientY: 381 });
+    fireEvent.pointerUp(box, { ...at, clientX: 502, clientY: 381 });
+    fireEvent.click(box);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(box.style.left).toBe("50%");
+    expect(localStorage.getItem("meguri.subtitlePosition")).toBeNull();
+  });
+
+  it("keeps the position for the next clip, and resets it from the panel", async () => {
+    localStorage.setItem(
+      "meguri.subtitlePosition",
+      JSON.stringify({ x: 0.25, y: 0.5 }),
+    );
+    const { box, area } = await setup();
+    expect(box.style.left).toBe("25%");
+    expect(box.style.top).toBe("50%");
+    // Paused, the control bar shows: the captions stay above it.
+    expect(area.className.split(" ")).toContain("bottom-20");
+    expect(area.className.split(" ")).not.toContain("bottom-3");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.subtitleResetPosition" }),
+    );
+    expect(box.style.left).toBe("50%");
+    expect(box.style.top).toBe("100%");
+    expect(localStorage.getItem("meguri.subtitlePosition")).toBeNull();
+  });
+});
+
+describe("audio and subtitles panel", () => {
+  const tracks = [{ title: "English", language: "eng", codec: "subrip" }];
+
+  it("opens inside the element that goes fullscreen", () => {
+    const target = document.createElement("div");
+    document.body.append(target);
+    const { video } = renderPlayer({
+      subtitleTracks: tracks,
+      fullscreenTargetRef: { current: target },
+    });
+    loadVideo(video);
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+    expect(
+      target.contains(
+        screen.getByRole("dialog", { name: "player.audioSubtitles" }),
+      ),
+    ).toBe(true);
+    target.remove();
+  });
+
+  it("keeps Space on its button from playing or pausing", () => {
+    const { video } = renderPlayer({ subtitleTracks: tracks });
+    loadVideo(video);
+    const play = vi
+      .spyOn(video, "play")
+      .mockImplementation(() => Promise.resolve());
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+      { code: "Space", key: " " },
+    );
+    expect(play).not.toHaveBeenCalled();
+    // The same key anywhere else in the player still plays.
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    expect(play).toHaveBeenCalled();
+  });
+});
+
+describe("ProRes preview recovery", () => {
+  it.each([true, false])(
+    "resumes a failed stream at its current time (paused=%s)",
+    async (paused) => {
+      vi.useFakeTimers();
+      try {
+        const { video } = renderPlayer({ reopenOnNetworkError: true });
+        video.src += "?t=30";
+        loadVideo(video);
+        video.currentTime = 2.75;
+        Object.defineProperty(video, "paused", {
+          configurable: true,
+          value: paused,
+        });
+        const play = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+        Object.defineProperty(video, "play", {
+          configurable: true,
+          value: play,
+        });
+        fireVideoError(video, 2);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300);
+        });
+        expect(new URL(video.src).searchParams.get("t")).toBe("32.75");
+        expect(video.autoplay).toBe(!paused);
+        expect(play).toHaveBeenCalledTimes(paused ? 0 : 1);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+});
+
+describe("ProRes preview reopening", () => {
+  it("reopens again after a reopened stream has loaded", async () => {
+    vi.useFakeTimers();
+    try {
+      const { video } = renderPlayer({ reopenOnNetworkError: true });
+      loadVideo(video);
+      video.currentTime = 5;
+      fireVideoError(video, 2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(new URL(video.src).searchParams.get("t")).toBe("5");
+      loadVideo(video);
+      video.currentTime = 4;
+      fireVideoError(video, 2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(new URL(video.src).searchParams.get("t")).toBe("9");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("VideoPlayer", () => {
   beforeEach(() => {
     fileRecordPlay.mockClear();
   });
   afterEach(() => {
     resetVideoHandOff();
+  });
+
+  it("keeps position and pause when changing audio and opens each clip on Default", () => {
+    const audioTracks = [
+      { title: "English", language: "eng", codec: "aac" },
+      { title: "Japanese", language: "jpn", codec: "aac" },
+    ];
+    const first = renderPlayer({ audioTracks, autoplay: false });
+    loadVideo(first.video);
+    first.video.currentTime = 12.75;
+    fireEvent.click(trackRadios("player.audioTrack")[2]);
+    const search = new URL(first.video.src).searchParams;
+    expect(search.get("audioTrack")).toBe("1");
+    expect(search.get("t")).toBe("12.75");
+    expect(first.video.autoplay).toBe(false);
+    loadVideo(first.video);
+    first.view.unmount();
+
+    const reopened = renderPlayer({ audioTracks });
+    expect(
+      new URL(reopened.video.src).searchParams.get("audioTrack"),
+    ).toBeNull();
+    expect(trackRadios("player.audioTrack")[0].checked).toBe(true);
   });
 
   describe("adopting a handed-over element", () => {
@@ -166,6 +531,22 @@ describe("VideoPlayer", () => {
       // to the previous host); the play itself is not recorded twice.
       expect(second.onPlayed).toHaveBeenCalledTimes(1);
       expect(fileRecordPlay).not.toHaveBeenCalled();
+    });
+
+    it("plays on at the speed the element had", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      markPlaying(first.video, 10);
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+
+      const second = renderPlayer();
+      expect(second.video).toBe(first.video);
+      expect(second.video.playbackRate).toBe(1.25);
+      expect(
+        screen.getByRole("button", { name: /Playback speed/ }).textContent,
+      ).toBe("1.25×");
     });
 
     it("advances on an element that ended while nobody was listening", () => {
@@ -305,12 +686,258 @@ describe("VideoPlayer", () => {
     expect(localStorage.getItem("meguri.player.muted")).toBe("1");
   });
 
+  it.each([
+    { case: "reports no picture", width: 1920, videoWidth: 0, shown: true },
+    { case: "plays a picture", width: 1920, videoWidth: 1920, shown: false },
+    {
+      case: "plays a file the scan saw no picture in",
+      width: null,
+      videoWidth: 0,
+      shown: false,
+    },
+  ])("$case on loadeddata", ({ width, videoWidth, shown }) => {
+    const { video } = renderPlayer({ width });
+    loadVideo(video);
+    Object.defineProperty(video, "videoWidth", {
+      configurable: true,
+      value: videoWidth,
+    });
+    fireEvent.loadedData(video);
+    expect(screen.queryByText("player.errNoPicture") != null).toBe(shown);
+  });
+
   it("exposes seek via ref handle", () => {
     const { video, ref } = renderPlayer();
     loadVideo(video);
 
     ref.current?.seek(42);
     expect(video.currentTime).toBe(42);
+  });
+
+  describe("re-serving a stream on a seek", () => {
+    /** A stream: nothing is seekable, so every seek re-serves the file. */
+    function streamOf(video: HTMLVideoElement, load = vi.fn()) {
+      const play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(video, "load", {
+        configurable: true,
+        value: load,
+      });
+      Object.defineProperty(video, "play", { configurable: true, value: play });
+      return play;
+    }
+
+    function playedRanges(video: HTMLVideoElement, length: number) {
+      Object.defineProperty(video, "played", {
+        configurable: true,
+        value: { length },
+      });
+    }
+
+    /** The metadata arriving, with the element's readyState saying so. */
+    function metadataIn(video: HTMLVideoElement) {
+      Object.defineProperty(video, "readyState", {
+        configurable: true,
+        value: 1,
+      });
+      fireEvent.loadedMetadata(video);
+    }
+
+    it("still starts a video whose autoplay was pending when the seek was asked for", () => {
+      // The seek arrives before the metadata (a scene picked right after
+      // Play), so it waits; by the time it lands the element is paused only
+      // because autoplay has not kicked in yet.
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      playedRanges(video, 0);
+
+      ref.current?.seek(30);
+      metadataIn(video);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(true);
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a video paused before it ever played paused", () => {
+      // Paused while still loading: nothing has played, but autoplay is no
+      // longer what is about to happen.
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      playedRanges(video, 0);
+      metadataIn(video);
+
+      // Whoever paused it: the bar, a media key, the frame export.
+      fireEvent.pause(video);
+      ref.current?.seek(30);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(false);
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it("starts at the opening position playing when Play came before the metadata", () => {
+      // Opened paused at a scene, then started while still loading: the
+      // opening seek must carry that over rather than the `autoplay` prop.
+      const { video } = renderPlayer({ autoplay: false, startAt: 30 });
+      const play = streamOf(video);
+      playedRanges(video, 0);
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        value: false,
+      });
+
+      metadataIn(video);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads a remuxed file from the opening position instead of re-serving it", () => {
+      const { video, ref } = renderPlayer({ remuxed: true, startAt: 30 });
+      const load = vi.fn();
+      const play = streamOf(video, load);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      metadataIn(video);
+
+      // One load, from the second asked for, and reported as that second.
+      expect(load).not.toHaveBeenCalled();
+      expect(play).not.toHaveBeenCalled();
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(ref.current?.currentTime()).toBe(30);
+    });
+
+    it("re-serves a remuxed file whose opening position moved while it loaded", () => {
+      const { video, view, props, ref } = renderPlayer({
+        remuxed: true,
+        startAt: 30,
+      });
+      const load = vi.fn();
+      streamOf(video, load);
+      view.rerender(
+        <Providers>
+          <VideoPlayer ref={ref} {...props} startAt={60} />
+        </Providers>,
+      );
+
+      metadataIn(video);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(video.getAttribute("src")).toContain("?t=60");
+      expect(ref.current?.currentTime()).toBe(60);
+    });
+
+    it("reports the position of a stream loaded from a `?t=` it was not asked for", () => {
+      // An element handed over before its metadata arrived: loaded from 30
+      // by the previous host, adopted by one with no opening position.
+      const { video, view, props, ref } = renderPlayer({
+        remuxed: true,
+        startAt: 30,
+      });
+      const load = vi.fn();
+      streamOf(video, load);
+      view.rerender(
+        <Providers>
+          <VideoPlayer ref={ref} {...props} startAt={0} />
+        </Providers>,
+      );
+
+      metadataIn(video);
+
+      expect(load).not.toHaveBeenCalled();
+      expect(ref.current?.currentTime()).toBe(30);
+    });
+
+    it("waits for the media origin before loading a remuxed file from the opening position", () => {
+      const { video } = renderPlayer({ remuxed: true, startAt: 30, src: "" });
+
+      expect(video.getAttribute("src")).toBeNull();
+    });
+
+    it("loads a file not known to be remuxed from the top", () => {
+      const { video } = renderPlayer({ startAt: 30 });
+
+      expect(video.getAttribute("src")).not.toContain("?t=");
+    });
+
+    it("keeps a video the user paused paused", () => {
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      metadataIn(video);
+      // It played and was paused: `paused` is the element's default here.
+      playedRanges(video, 1);
+
+      ref.current?.seek(30);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(false);
+      expect(play).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("playback speed", () => {
+    it("steps with Shift+< and Shift+>, and the menu sets it", () => {
+      const { video } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      expect(video.playbackRate).toBe(1.5);
+      fireEvent.keyDown(window, { code: "Comma", key: "<", shiftKey: true });
+      expect(video.playbackRate).toBe(1.25);
+      // Without Shift the keys type "." and "," and do nothing.
+      fireEvent.keyDown(window, { code: "Period", key: "." });
+      expect(video.playbackRate).toBe(1.25);
+
+      fireEvent.click(screen.getByRole("button", { name: /Playback speed/ }));
+      fireEvent.click(screen.getByRole("radio", { name: "2×" }));
+      expect(video.playbackRate).toBe(2);
+    });
+
+    it("keeps the speed through a reload of the same file", () => {
+      const { video } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      // A new source (a stream reopened at another second) starts the element
+      // at normal speed again.
+      video.playbackRate = 1;
+      loadVideo(video);
+      expect(video.playbackRate).toBe(1.25);
+    });
+
+    it("starts the next file at normal speed", () => {
+      const { video, view, ref, props } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      expect(video.playbackRate).toBe(1.25);
+      view.rerender(
+        <Providers>
+          <VideoPlayer
+            ref={ref}
+            {...props}
+            id={2}
+            src="http://127.0.0.1:17345/ws/ws1/media/2"
+          />
+        </Providers>,
+      );
+      expect(
+        screen.getByRole("button", { name: /Playback speed/ }),
+      ).toHaveProperty("textContent", "1×");
+      loadVideo(document.querySelector("video")!);
+      expect(document.querySelector("video")!.playbackRate).toBe(1);
+    });
+  });
+
+  it("leaves the keyboard alone when its shortcuts are off", () => {
+    const { video } = renderPlayer({ shortcuts: false, navKeys: undefined });
+    loadVideo(video);
+    const play = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(video, "play", { configurable: true, value: play });
+
+    // fireEvent returns false when a handler called preventDefault.
+    expect(fireEvent.keyDown(window, { code: "ArrowRight" })).toBe(true);
+    expect(fireEvent.keyDown(window, { code: "Space" })).toBe(true);
+    expect(video.currentTime).toBe(0);
+    expect(play).not.toHaveBeenCalled();
   });
 
   describe("holding a seek key", () => {
@@ -515,6 +1142,20 @@ describe("VideoPlayer", () => {
     expect(onPlayed).toHaveBeenCalledTimes(1);
   });
 
+  it("records no play, and fires no onPlayed, when told not to", () => {
+    const { video, onPlayed } = renderPlayer({
+      autoplay: false,
+      recordPlay: false,
+    });
+    loadVideo(video);
+
+    fireEvent.play(video);
+
+    expect(fileRecordPlay).not.toHaveBeenCalled();
+    // A caller's onPlayed updates what a recorded play changes.
+    expect(onPlayed).not.toHaveBeenCalled();
+  });
+
   it("ignores MEDIA_ERR_ABORTED without surfacing the error screen", () => {
     const { video } = renderPlayer();
 
@@ -573,6 +1214,25 @@ describe("VideoPlayer", () => {
     fireVideoError(video, 2);
 
     expect(screen.queryByText("player.playFailed")).not.toBeNull();
+  });
+
+  it("toasts when the error screen cannot open the file externally (#682)", async () => {
+    vi.mocked(api.openExternal).mockRejectedValueOnce(new Error("gone"));
+    const toastError = vi.spyOn(toast, "error");
+    const { video } = renderPlayer();
+
+    fireVideoError(video, 4);
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.openExternal" }),
+    );
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Could not open externally", {
+        description: "gone",
+      }),
+    );
+    expect(api.openExternal).toHaveBeenCalledWith(1, "ws1");
+    toastError.mockRestore();
   });
 
   it("remounts the video with the reload button after a fatal error", () => {
@@ -651,6 +1311,20 @@ describe("VideoPlayer", () => {
       });
     });
 
+    it("reports nothing when told not to record the position", () => {
+      const { video, view } = renderPlayer({
+        autoplay: false,
+        recordPosition: false,
+      });
+      loadVideo(video);
+      standAt(video, 0, false);
+      fireEvent.play(video);
+      standAt(video, 3, true);
+      fireEvent.pause(video);
+      view.unmount();
+      expect(fileSavePosition).not.toHaveBeenCalled();
+    });
+
     it("reports nothing for a file that never played", () => {
       const { video, view } = renderPlayer({ autoplay: false, startAt: 30 });
       loadVideo(video);
@@ -698,5 +1372,225 @@ describe("VideoPlayer", () => {
       );
       expect(video.currentTime).toBe(30);
     });
+  });
+});
+
+// The detail view's video zooms and pans like its image (#637). The transform
+// sits on what holds the <video>, so a handed-over element leaves it behind.
+describe("zoom and pan", () => {
+  afterEach(() => {
+    resetVideoHandOff();
+  });
+
+  // A clip of the given size in the same 1000 × 500 stage.
+  function renderPlayerAt(
+    size: { w: number; h: number },
+    overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {},
+  ) {
+    const r = renderPlayer({ zoomable: true, ...overrides });
+    const stage = r.video.parentElement?.parentElement as HTMLDivElement;
+    stage.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 500 }) as DOMRect;
+    Object.defineProperty(r.video, "videoWidth", { value: size.w });
+    Object.defineProperty(r.video, "videoHeight", { value: size.h });
+    loadVideo(r.video);
+    return { ...r, stage };
+  }
+
+  // A 2000 × 1000 video fitted to the stage: 50% of actual pixels.
+  function setup(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}) {
+    const r = renderPlayerAt({ w: 2000, h: 1000 }, overrides);
+    return { ...r, picture: r.video.parentElement as HTMLDivElement };
+  }
+
+  const level = () => screen.getByText(/^\d+%$/).textContent;
+  const button = (title: string) => screen.getByTitle<HTMLButtonElement>(title);
+
+  function ctrlWheel(target: Element, x: number, y: number) {
+    const ev = new WheelEvent("wheel", {
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    for (const [k, v] of Object.entries({
+      ctrlKey: true,
+      clientX: x,
+      clientY: y,
+    }))
+      Object.defineProperty(ev, k, { value: v });
+    act(() => {
+      target.dispatchEvent(ev);
+    });
+  }
+
+  it("starts at fit, with the controls in the bar", () => {
+    const { picture } = setup();
+    expect(level()).toBe("50%");
+    expect(button("media.zoomOut").disabled).toBe(true);
+    expect(button("media.zoomFit").disabled).toBe(true);
+    expect(picture.style.transform).toBe("");
+  });
+
+  it("is not offered unless the host asks for it", () => {
+    const { video } = renderPlayer();
+    Object.defineProperty(video, "videoWidth", { value: 2000 });
+    Object.defineProperty(video, "videoHeight", { value: 1000 });
+    loadVideo(video);
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+  });
+
+  it("zooms with Ctrl+wheel toward the pointer, on the holder and not the element", () => {
+    const { picture, stage, video } = setup();
+    const onWindowWheel = vi.fn();
+    window.addEventListener("wheel", onWindowWheel);
+    try {
+      ctrlWheel(stage, 250, 125);
+    } finally {
+      window.removeEventListener("wheel", onWindowWheel);
+    }
+    expect(onWindowWheel).not.toHaveBeenCalled();
+    expect(level()).toBe("60%");
+    // ×1.2 with the point under the pointer staying put.
+    expect(picture.style.transform).toBe("translate(-50px, -25px) scale(1.2)");
+    expect(video.style.transform).toBe("");
+    fireEvent.click(button("media.zoomFit"));
+    expect(level()).toBe("50%");
+    expect(picture.style.transform).toBe("");
+  });
+
+  it("pans on a drag without playing or pausing, while a click still does", () => {
+    const { picture, video } = setup();
+    const play = vi.fn().mockResolvedValue(undefined);
+    video.play = play;
+    picture.setPointerCapture = () => {};
+    fireEvent.click(button("media.zoomIn"));
+    fireEvent.click(button("media.zoomIn"));
+    // 0.78125 of actual pixels, centred: 1562.5 × 781.25 over 1000 × 500.
+    expect(picture.style.transform).toBe(
+      "translate(-281.25px, -140.625px) scale(1.5625)",
+    );
+
+    const at = { pointerId: 1, button: 0, buttons: 1 };
+    fireEvent.pointerDown(picture, { ...at, clientX: 500, clientY: 250 });
+    fireEvent.pointerMove(picture, { ...at, clientX: 600, clientY: 300 });
+    fireEvent.pointerUp(picture, { ...at, clientX: 600, clientY: 300 });
+    fireEvent.click(video);
+    expect(picture.style.transform).toBe(
+      "translate(-181.25px, -90.625px) scale(1.5625)",
+    );
+    expect(play).not.toHaveBeenCalled();
+
+    // A press that hardly moves is a click.
+    fireEvent.pointerDown(picture, { ...at, clientX: 500, clientY: 250 });
+    fireEvent.pointerMove(picture, { ...at, clientX: 502, clientY: 251 });
+    fireEvent.pointerUp(picture, { ...at, clientX: 502, clientY: 251 });
+    fireEvent.click(video);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(picture.style.transform).toBe(
+      "translate(-181.25px, -90.625px) scale(1.5625)",
+    );
+  });
+
+  it("leaves only the round play button over a paused, zoomed picture", () => {
+    const { video } = setup();
+    Object.defineProperty(video, "paused", { configurable: true, value: true });
+    fireEvent.pause(video);
+    const overlay = button("player.play");
+    expect(overlay.className).not.toContain("pointer-events-none");
+    fireEvent.click(button("media.zoomIn"));
+    expect(overlay.className).toContain("pointer-events-none");
+  });
+
+  it("goes back to fit when entering or leaving fullscreen", () => {
+    const { picture } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    expect(picture.style.transform).not.toBe("");
+    act(() => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    expect(picture.style.transform).toBe("");
+    expect(level()).toBe("50%");
+  });
+
+  it("still zooms with Ctrl+wheel after the error screen's reload", () => {
+    const { video } = setup();
+    fireVideoError(video, 3);
+    fireEvent.click(screen.getByText("player.reload"));
+    const next = document.querySelector("video") as HTMLVideoElement;
+    const picture = next.parentElement as HTMLDivElement;
+    const stage = picture.parentElement as HTMLDivElement;
+    stage.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 500 }) as DOMRect;
+    Object.defineProperty(next, "videoWidth", { value: 2000 });
+    Object.defineProperty(next, "videoHeight", { value: 1000 });
+    loadVideo(next);
+    expect(level()).toBe("50%");
+    ctrlWheel(stage, 250, 125);
+    expect(level()).toBe("60%");
+  });
+
+  it("offers no zoom for the next file before its picture has a size", () => {
+    const { view, props, stage } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    view.rerender(
+      <Providers>
+        <VideoPlayer
+          {...props}
+          zoomable
+          id={2}
+          src="http://127.0.0.1:17345/ws/ws1/media/2"
+        />
+      </Providers>,
+    );
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+    // Nothing to zoom: the window's own zoom takes the wheel.
+    const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "ctrlKey", { value: true });
+    act(() => {
+      stage.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("leaves the wheel to the window for a clip already past the highest zoom at fit", () => {
+    const { stage } = renderPlayerAt({ w: 100, h: 50 });
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+    const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "ctrlKey", { value: true });
+    act(() => {
+      stage.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("forgets a press let go over the play button before it panned", () => {
+    const { picture, video } = setup();
+    picture.setPointerCapture = () => {};
+    Object.defineProperty(video, "paused", { configurable: true, value: true });
+    fireEvent.pause(video);
+    fireEvent.click(button("media.zoomIn"));
+    const before = picture.style.transform;
+    const at = { pointerId: 1, button: 0, buttons: 1 };
+    fireEvent.pointerDown(picture, { ...at, clientX: 100, clientY: 100 });
+    fireEvent.pointerLeave(picture, { ...at, clientX: 102, clientY: 100 });
+    // Later, a held button moving over the picture without a press here.
+    fireEvent.pointerMove(picture, { ...at, clientX: 300, clientY: 200 });
+    expect(picture.style.transform).toBe(before);
+  });
+
+  it("goes back to fit on another file", () => {
+    const { picture, view, props } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    view.rerender(
+      <Providers>
+        <VideoPlayer
+          {...props}
+          zoomable
+          id={2}
+          src="http://127.0.0.1:17345/ws/ws1/media/2"
+        />
+      </Providers>,
+    );
+    expect(picture.style.transform).toBe("");
   });
 });

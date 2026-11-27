@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
 import { searchFiles, setNote } from "../queries.js";
 import { syncFts } from "../tags.js";
-import { joinSearchTokens, splitSearchTokens } from "../../../shared/tags.js";
+import {
+  joinSearchTokens,
+  searchDirectiveKey,
+  splitSearchTokens,
+} from "../../../shared/tags.js";
 import { insertFile, newDb } from "./helpers.js";
 
 function names(db: DB, q: string): string[] {
@@ -90,6 +94,22 @@ describe("has:note search", () => {
   });
 });
 
+describe("excluding by note", () => {
+  it("keeps the files whose note lacks the text, and those without a note", () => {
+    const db = library();
+    expect(names(db, "-note:pexels")).toEqual([
+      "beach.mp4",
+      "pexels-in-name.mp4",
+      "plain.mp4",
+    ]);
+  });
+
+  it("keeps the files without a note for -has:note", () => {
+    const db = library();
+    expect(names(db, "-has:note")).toEqual(["pexels-in-name.mp4", "plain.mp4"]);
+  });
+});
+
 describe("note directives in the tokenizer", () => {
   it("does not take a directive typed after an abandoned `note: ` as its value", () => {
     expect(splitSearchTokens("note: tag:beach")).toEqual([
@@ -99,6 +119,22 @@ describe("note directives in the tokenizer", () => {
     expect(splitSearchTokens("note: has:note")).toEqual(["note:", "has:note"]);
     expect(splitSearchTokens("tag: note:x")).toEqual(["tag:", "note:x"]);
     expect(splitSearchTokens("note: pexels")).toEqual(["note:pexels"]);
+    // Only a real directive stops the fold: `size:large` is no directive.
+    expect(splitSearchTokens("note: size:large")).toEqual(["note:size:large"]);
+  });
+
+  it("calls two spellings of one note value the same condition", () => {
+    expect(searchDirectiveKey("note:École")).toBe(
+      searchDirectiveKey("note:école"),
+    );
+    expect(searchDirectiveKey("HAS:note")).toBe(searchDirectiveKey("has:note"));
+    expect(searchDirectiveKey("-has:note")).not.toBe(
+      searchDirectiveKey("has:note"),
+    );
+  });
+
+  it("quotes only the value when joining, outside a negation's dash", () => {
+    expect(joinSearchTokens(["-note:école shoot"])).toBe('-note:"école shoot"');
   });
 
   it("quotes only the value when joining", () => {

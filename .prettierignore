@@ -4,3 +4,14 @@ dist/
 node_modules/
 package-lock.json
 *.min.js
+# Local agent worktrees and the working files of local AI tools, which some
+# keep untracked in the checkout.
+.claude/
+.specify/
+specs/
+.serena/
+.playwright-mcp/
+
+# The GitHub Pages site is hand-written HTML: reformatting it would only churn
+# it and can change how inline whitespace renders.
+docs/*.html

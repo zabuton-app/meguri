@@ -9,7 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router";
+import {
+  Link,
+  Outlet,
+  matchPath,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import {
   useQuery,
   useQueryClient,
@@ -43,6 +49,7 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
+import { SearchTrigger } from "@/components/SearchTrigger";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
 import { Pet } from "@/components/pet/Pet";
@@ -54,6 +61,7 @@ import {
   onOpenCommandMenu,
   onOpenShortcuts,
   onSearchLibrary,
+  onShowMatchingFiles,
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -61,16 +69,26 @@ import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
+import { useFolderPathActions } from "@/hooks/useFolderPathActions";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { useStartupTimings } from "@/hooks/useStartupTimings";
+import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
+import { FilmstripView } from "@/filmstrip/FilmstripView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
+import { fileWorkspaceId } from "@/routes/MediaDetail/fileWorkspace";
+import { useImmersiveViewOpen } from "@/components/immersiveView";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
 import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
-import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
+import { defaultQueryOf, hasFilterConditions } from "@/lib/smartCollections";
+import {
+  initialFilter,
+  smartCollectionsQuery,
+} from "@/hooks/useSmartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { useSettledFilter } from "./useSettledFilter";
@@ -97,6 +115,8 @@ import {
   parseViewMode,
 } from "./utils";
 import { scrollListByPage, turnListPage } from "./pageScroll";
+import { appName } from "@/lib/appName";
+import { isTyping } from "@/lib/keyTarget";
 
 // The graph view carries WebGL and graph libraries the list views never need,
 // so it is loaded the first time it is shown.
@@ -114,6 +134,7 @@ const RECENT_SEARCH_SETTLE_MS = 1500;
 
 export default function Home() {
   const { t } = useI18n();
+  const folderPathActions = useFolderPathActions();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const location = useLocation();
@@ -123,10 +144,28 @@ export default function Home() {
   const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  // Opens on the default saved search, if one is set (see loadInitialFilter).
-  const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  // Opens on the default saved search, if one is set (see initialFilter).
+  const [filter, setFilter] = useState<SearchQuery>(() => initialFilter(qc));
   // Compared by identity below: every later filter is a new object.
-  const openedWith = useRef(filter);
+  const [openedWith, setOpenedWith] = useState(filter);
+  // The saved searches normally load before the first render (renderApp).
+  // When that failed, the default is applied once they arrive, unless the
+  // filter was changed in the meantime.
+  const smartCollections = useQuery(smartCollectionsQuery).data;
+  const [awaitingDefault, setAwaitingDefault] = useState(
+    () => qc.getQueryData(smartCollectionsQuery.queryKey) === undefined,
+  );
+  if (awaitingDefault && smartCollections) {
+    setAwaitingDefault(false);
+    const query = defaultQueryOf(
+      smartCollections.collections,
+      smartCollections.defaultId,
+    );
+    if (query && filter === openedWith) {
+      setFilter(query);
+      setOpenedWith(query);
+    }
+  }
   // What the list queries run on: `filter` with its free text held back while
   // it is being typed (see useSettledFilter). The filter bar shows `filter`.
   const queryFilter = useSettledFilter(filter);
@@ -234,6 +273,11 @@ export default function Home() {
       setByFolder: showByFolder,
     });
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
+  // For listeners registered once (see onShowMatchingFiles below).
+  const onFilterChangeRef = useRef(onFilterChange);
+  useEffect(() => {
+    onFilterChangeRef.current = onFilterChange;
+  }, [onFilterChange]);
   // What the heatmap counts over: the filter, within the folder shown and
   // everything below it — what the list becomes once a day narrows it (a
   // condition turns a folder's own files into a search of its subtree).
@@ -279,6 +323,10 @@ export default function Home() {
     (search.isLoading ||
       (folderView && !folderSearching && folderListing.isLoading)) &&
     (status.data?.ready ?? false);
+  useStartupTimings(status.data, {
+    shown: search.isSuccess && !listLoading,
+    failed: search.isError,
+  });
   // Picking a folder selects every file below it (see SelectionContext).
   const expandFolders = useCallback(
     (paths: string[]) => api.folderFiles(workspaceId ?? "", paths),
@@ -368,9 +416,13 @@ export default function Home() {
   // Drag-to-reorder edits the collection's own item order, so it is offered only
   // where that order is both stored (a collection) and visible (manual sort).
   const manualSort = filter.sort === MANUAL_SORT;
-  // (The timeline shows its own order whatever the sort says.)
+  // (The timeline shows its own order whatever the sort says; the filmstrip
+  // shows the order but its rows are not dragged.)
   const reorderCollectionId =
-    activeCollection && manualSort && view !== "timeline"
+    activeCollection &&
+    manualSort &&
+    view !== "timeline" &&
+    view !== "filmstrip"
       ? activeCollection.id
       : null;
 
@@ -409,17 +461,19 @@ export default function Home() {
                   return { ...prev, pages };
                 },
               );
+              const order = next.map((f) => ({
+                workspaceId: f.workspaceId,
+                fileId: f.id,
+              }));
+              patchCollectionItemOrder(qc, reorderCollectionId, order);
               void api
-                .collectionReorderItems(
-                  reorderCollectionId,
-                  next.map((f) => ({
-                    workspaceId: f.workspaceId,
-                    fileId: f.id,
-                  })),
-                )
+                .collectionReorderItems(reorderCollectionId, order)
                 .catch(() => {
                   // Fall back to the stored order if the write did not land.
                   void qc.invalidateQueries({ queryKey: ["files_search"] });
+                  void qc.invalidateQueries({
+                    queryKey: ["workspaces_list"],
+                  });
                 });
             },
           }
@@ -431,7 +485,11 @@ export default function Home() {
   // while nothing else can want those keys: no detail/settings/discover route
   // open — a docked side peek included, its player takes the arrows — and no
   // help/command overlay on top.
-  const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
+  // An immersive view that is not a route (the image comparison, opened from
+  // the selection bar) covers the list as a routed modal does.
+  const immersiveOpen = useImmersiveViewOpen();
+  const navActive =
+    location.pathname === "/" && !helpOpen && !commandOpen && !immersiveOpen;
 
   // Folder view moves (back / up), while the list is in front — a docked side
   // peek included it is not, as its player owns those keys.
@@ -443,8 +501,8 @@ export default function Home() {
 
   useEffect(() => {
     document.title = status.data?.root
-      ? `Meguri — ${status.data.root}`
-      : "Meguri";
+      ? `${appName()} — ${status.data.root}`
+      : appName();
   }, [status.data?.root]);
 
   // On thumb:done, bump the version for that id to force the thumbnail to reload.
@@ -505,13 +563,13 @@ export default function Home() {
   // with: the default saved search was not searched for, and would otherwise
   // head the recents after every launch.
   useEffect(() => {
-    if (filter === openedWith.current) return;
+    if (filter === openedWith) return;
     const timer = window.setTimeout(
       () => recordRecentSearch(filter),
       RECENT_SEARCH_SETTLE_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [filter]);
+  }, [filter, openedWith]);
 
   // Stabilize the reference so MediaCard's memo stays effective.
   // A click AND-appends an exact tag condition rather than overwriting the
@@ -535,34 +593,32 @@ export default function Home() {
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
-    let un: (() => void) | undefined;
-    void events
-      .onScanDone((done) => {
-        setScanning(false);
-        void status.refetch();
-        void search.refetch();
-        // Folders appear, fill up and empty out with a scan like files do.
-        void qc.invalidateQueries({ queryKey: ["folders_list"] });
-        void qc.invalidateQueries({ queryKey: ["graph_build"] });
-        void qc.invalidateQueries({ queryKey: ["activity_days"] });
-        void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
-        // A scan can add tags (new files, the derived-tag backfill), so a tag
-        // screen left open would otherwise show a stale catalog.
-        void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
-        const mode = manualScanJobs.current.get(done.jobId);
-        manualScanJobs.current.delete(done.jobId);
-        notifyScanDone(done, mode);
-      })
-      .then((u) => {
-        un = u;
-        // Listening now; a scan that failed before (the startup scan can
-        // finish before this view mounts) is asked about instead.
-        void api
-          .scanUnreadableWorkspaces()
-          .then((ids) => ids.forEach(notifyRootUnreadable))
-          .catch(() => {});
-      });
-    return () => un?.();
+    const unlisten = events.onScanDone((done) => {
+      setScanning(false);
+      void status.refetch();
+      void search.refetch();
+      // Folders appear, fill up and empty out with a scan like files do.
+      void qc.invalidateQueries({ queryKey: ["folders_list"] });
+      void qc.invalidateQueries({ queryKey: ["graph_build"] });
+      void qc.invalidateQueries({ queryKey: ["activity_days"] });
+      void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
+      // A scan can add tags (new files, the derived-tag backfill), so a tag
+      // screen left open would otherwise show a stale catalog.
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      // Files go missing and come back with a scan, and a workspace is left
+      // out of the missing list while it is being scanned.
+      void qc.invalidateQueries({ queryKey: ["missing_files"] });
+      const mode = manualScanJobs.current.get(done.jobId);
+      manualScanJobs.current.delete(done.jobId);
+      notifyScanDone(done, mode);
+    });
+    // Listening now; a scan that failed before (the startup scan can
+    // finish before this view mounts) is asked about instead.
+    void api
+      .scanUnreadableWorkspaces()
+      .then((ids) => ids.forEach(notifyRootUnreadable))
+      .catch(() => {});
+    return unlisten;
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -616,14 +672,6 @@ export default function Home() {
     });
     if (ok) void onScan(false, true);
   };
-
-  const focusSearch = useCallback(() => {
-    const input = document.getElementById(
-      "list-search-input",
-    ) as HTMLInputElement | null;
-    input?.focus();
-    input?.select();
-  }, []);
 
   const openDiscover = useCallback(() => {
     void navigate(discoverPath(subtreeFilter));
@@ -701,14 +749,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if (isHelpKey(e)) {
         e.preventDefault();
         setHelpOpen(true);
@@ -724,7 +765,22 @@ export default function Home() {
   // list in use. (Card focus navigation stays off then: its arrow keys would
   // fight the player's.)
   const peekDocked = usePeekDocked();
-  const listShortcutsActive = location.pathname === "/" || peekDocked;
+  const listShortcutsActive =
+    (location.pathname === "/" || peekDocked) && !immersiveOpen;
+  // The file the docked peek shows, which the list marks and scrolls to,
+  // resolved to a workspace the same way the detail does.
+  const peekFileId = peekDocked
+    ? matchPath("/file/:id", location.pathname)?.params.id
+    : undefined;
+  const peekFileKey = peekFileId
+    ? mediaSortId({
+        workspaceId: fileWorkspaceId(
+          new URLSearchParams(location.search).get("ws"),
+          status.data?.workspaceId,
+        ),
+        id: Number(peekFileId),
+      })
+    : undefined;
 
   // Tours run on the bare list only: no routed modal, overlay or menu on top
   // (the same condition as the views' keyboard navigation, navActive).
@@ -738,17 +794,14 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
       const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const b = NAV_BINDINGS[keybindingPreset];
       if (matchAny(e, b.focusSearch)) {
         // Let the key type normally if a field already has focus.
         if (typing) return;
         e.preventDefault();
-        focusSearch();
+        // The search is typed in the command menu (SearchTrigger).
+        setCommandOpen(true);
         return;
       }
       if (typing) return;
@@ -768,18 +821,11 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [listShortcutsActive, keybindingPreset, helpOpen, focusSearch]);
+  }, [listShortcutsActive, keybindingPreset, helpOpen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyK") {
         e.preventDefault();
         setCommandOpen((open) => !open);
@@ -800,11 +846,18 @@ export default function Home() {
     const unSearch = onSearchLibrary((tokens) =>
       setFilter((f) => replaceSearchTokens(f, tokens)),
     );
+    // Through onFilterChange, which leaves the folder browsed for the root
+    // when the folder is not part of what it is handed.
+    const unShow = onShowMatchingFiles((tokens) => {
+      const { sort, sortDir } = filterRef.current;
+      onFilterChangeRef.current(replaceSearchTokens({ sort, sortDir }, tokens));
+    });
     return () => {
       unCommand();
       unShortcuts();
       unApplyTags();
       unSearch();
+      unShow();
     };
   }, []);
 
@@ -820,12 +873,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const overlayOpen =
         location.pathname !== "/" ||
         helpOpen ||
@@ -898,6 +946,7 @@ export default function Home() {
         onScan={() => void onScan()}
         onScanWithDeleted={() => void onScan(true)}
         onRebuild={() => void onRebuild()}
+        search={<SearchTrigger value={filterValue} onChange={onFilterChange} />}
         t={t}
       />
 
@@ -947,31 +996,15 @@ export default function Home() {
           canGoBack={folderNav.canGoBack}
           onBack={folderNav.goBack}
           onUp={folderNav.goUp}
-          onOpenInFileManager={() => {
-            api
-              .folderOpenInFileManager(workspaceId ?? "", folderNav.path)
-              .catch((error: unknown) =>
-                toast.error(t("folder.openFailed"), {
-                  id: "folder-open-failed",
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                }),
-              );
-          }}
-          onCopyPath={() => {
-            api.folderCopyPath(workspaceId ?? "", folderNav.path).then(
-              () =>
-                toast.success(t("folder.pathCopied"), {
-                  id: "folder-path-copied",
-                }),
-              (error: unknown) =>
-                toast.error(t("folder.copyFailed"), {
-                  id: "folder-copy-failed",
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                }),
-            );
-          }}
+          onOpenInFileManager={() =>
+            folderPathActions.openInFileManager(
+              workspaceId ?? "",
+              folderNav.path,
+            )
+          }
+          onCopyPath={() =>
+            folderPathActions.copyPath(workspaceId ?? "", folderNav.path)
+          }
           summary={
             // What the folder itself holds; a search shows its own results.
             // (and only once the listing is the folder named: a vanished
@@ -1060,6 +1093,27 @@ export default function Home() {
                 onAnchor={timeline.onAnchor}
                 navActive={navActive}
                 watchLater={activeCollection?.id === WATCH_LATER_ID}
+                peekFileKey={peekFileKey}
+              />
+            ) : view === "filmstrip" ? (
+              <FilmstripView
+                items={items}
+                mediaBase={status.data?.mediaBase ?? ""}
+                workspaceId={status.data?.workspaceId ?? ""}
+                listOffset={listOffset}
+                loading={listLoading}
+                onTagClick={onTagClick}
+                hasNextPage={search.hasNextPage}
+                fetchNextPage={fetchNextPage}
+                isFetchingNextPage={search.isFetchingNextPage}
+                hasPreviousPage={search.hasPreviousPage}
+                fetchPreviousPage={fetchPreviousPage}
+                isFetchingPreviousPage={search.isFetchingPreviousPage}
+                navActive={navActive}
+                watchLater={activeCollection?.id === WATCH_LATER_ID}
+                peekFileKey={peekFileKey}
+                resetKey={viewResetKey}
+                decodeSlots={status.data?.decodeSlots}
               />
             ) : view === "list" ? (
               <MediaList
@@ -1082,6 +1136,7 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={viewResetKey}
                 inFolder={folderSearching}
+                peekFileKey={peekFileKey}
               />
             ) : (
               // By folder, either view gets the folders ahead of the files
@@ -1106,6 +1161,7 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={viewResetKey}
                 inFolder={folderSearching}
+                peekFileKey={peekFileKey}
               />
             )}
           </main>
@@ -1132,7 +1188,6 @@ export default function Home() {
           ready={status.data?.ready ?? false}
           scanning={scanning}
           devToolsEnabled={status.data?.devMode ?? false}
-          onFocusSearch={focusSearch}
           onScan={(includeExcluded) => void onScan(includeExcluded)}
           onRebuild={() => void onRebuild()}
           onSetView={setViewMode}
@@ -1144,12 +1199,19 @@ export default function Home() {
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}
+          onHistory={() => void navigate("/history")}
+          onDuplicates={() => void navigate("/duplicates")}
+          onAutoTag={() => void navigate("/auto-tag")}
           onSettings={openSettings}
           onHelp={() => setHelpOpen(true)}
           onOpenDevTools={openDevTools}
           onApplySearch={onApplyRecent}
           onApplySaved={onApplySaved}
-          onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
+          onSearch={(q) =>
+            onFilterChange({ ...filterValue, q: q || undefined })
+          }
+          filter={filterValue}
+          onFilterChange={onFilterChange}
           fileActionsAvailable={location.pathname === "/"}
         />
       </SelectionProvider>
@@ -1207,7 +1269,12 @@ export default function Home() {
         onDiscover={openDiscover}
       />
 
-      {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <ShortcutsOverlay
+          onClose={() => setHelpOpen(false)}
+          onOpenSettings={openSettings}
+        />
+      )}
 
       <CollectionEditDialog
         open={!!editCollection}

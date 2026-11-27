@@ -1,0 +1,38 @@
+name: Feature proposal
+description: A concrete proposal for a new feature or an improvement.
+labels: ["enhancement", "status: proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the proposal. If your idea is still taking shape, start a thread in Ideas in Discussions instead.
+        See "Start with a conversation" in CONTRIBUTING.md for how proposals become issues.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like Meguri to behave?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the problem, including workarounds you use now.
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to implement this?
+      options:
+        - "Yes"
+        - "Maybe, with some guidance"
+        - "No"
+    validations:
+      required: true

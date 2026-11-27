@@ -1,5 +1,10 @@
-// Application-wide config (list of registered workspaces = scan roots, and the active root).
-// Each root's artifacts are separated into per-root directories, so the cross-cutting list is kept here.
+// Application-wide settings: the registered workspaces (scan roots) and the
+// active one, and the app's own preferences; collections are kept apart, in
+// collectionStore.ts. Each root's artifacts are separated into per-root
+// directories, so what crosses them is kept here.
+// Stored in the shared library (`app_settings`, db.ts), which gives them its
+// backups, check and restore (libraryBackup.ts); `config.json`, where they
+// used to live, is imported once and then left alone.
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -21,18 +26,29 @@ import {
   type AutoTagConfig,
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
+import { isNormalizedFolderPath } from "../../shared/folderPath.js";
+import {
+  emptyScanExclusions,
+  MAX_EXCLUDED_FOLDERS,
+  MAX_EXCLUSION_PATTERNS,
+  PATTERN_KINDS,
+  samePattern,
+  type ExclusionPattern,
+  type PatternKind,
+  type ScanExclusions,
+} from "../../shared/scanExclusions.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
 import { isThemeFileName } from "./cssThemes.js";
 import type { AutoTagEngine } from "./autoTagDeriver.js";
+import { errorCode, openSettingsDb, type DB } from "./db.js";
 import log from "./logger.js";
+import { libraryDbPath } from "./paths.js";
 
 export interface AppConfig {
   /** Registered roots (absolute paths, normalized). */
   roots: string[];
   /** Currently active root. null if none is selected. */
   activePath: string | null;
-  /** User-curated virtual folders. Items reference files by workspace ID + file ID. */
-  collections: UserCollectionConfig[];
   /** Optional per-workspace emoji icon, keyed by workspace ID (hash of root path). */
   workspaceEmojis: Record<string, string>;
   /** Update-check preferences (GitHub Releases). */
@@ -56,6 +72,8 @@ export interface AppConfig {
    * none. Main reads it to send the theme's contents with the list.
    */
   cssTheme: string | null;
+  /** What scans leave out: patterns for every workspace, folders per workspace (#282). */
+  scanExclusions: ScanExclusions;
 }
 
 export interface CustomCssConfig {
@@ -86,53 +104,57 @@ const DEFAULT_UPDATE_CONFIG: UpdateConfig = {
   lastCheckAt: null,
 };
 
-export interface UserCollectionItemConfig {
-  workspaceId: string;
-  fileId: number;
-  addedAt: number;
-}
-
-export interface UserCollectionConfig {
-  id: string;
-  name: string;
-  /** Optional emoji icon; falls back to the folder icon when unset. */
-  emoji?: string;
-  items: UserCollectionItemConfig[];
-  createdAt: number;
-  updatedAt: number;
-  /**
-   * Built-in collections (currently only "Watch Later") set this. Locked
-   * collections can still gain and lose files, and their files can still be
-   * rearranged, but the collection itself cannot be removed, renamed, re-iconed
-   * or repositioned among the collections. Absent/false on every user-created one.
-   */
-  locked?: boolean;
-}
-
+/** Where the settings lived before they moved into the library. */
 function configPath(): string {
   return path.join(app.getPath("userData"), "config.json");
 }
 
+// Every field of AppConfig, each one row of app_settings (db.ts). A Record so
+// a field AppConfig gains has to be named here too.
+const FIELD_SET: Record<keyof AppConfig, true> = {
+  roots: true,
+  activePath: true,
+  workspaceEmojis: true,
+  update: true,
+  logo: true,
+  autoTag: true,
+  customCss: true,
+  cssTheme: true,
+  scanExclusions: true,
+};
+const FIELDS = Object.keys(FIELD_SET) as (keyof AppConfig)[];
+
+/** The row that records config.json as imported (see openStore); never a field. */
+export const IMPORTED_KEY = "_config_json_imported_at";
+
 /**
- * What went wrong reading config.json at startup, for the renderer to tell the
- * user (app_status.configProblem):
- * - "moved-aside": it could not be parsed, so it was renamed to
+ * The row config.json's collections are imported into, as they were there,
+ * for collectionStore.ts to move into its tables: what was there before the
+ * collections had tables of their own. Never a field.
+ */
+export const COLLECTIONS_KEY = "collections";
+
+/**
+ * What went wrong reading the settings at startup, for the renderer to tell
+ * the user (app_status.configProblem):
+ * - "moved-aside": config.json, imported on the first launch after the
+ *   settings moved into the library, could not be parsed, so it was renamed to
  *   `config.json.corrupt-<time>` and the app started from defaults.
- * - "unreadable": it exists but could not be read (locked, no permission), or
- *   could not be moved aside, so the app runs on defaults and does not write
- *   over it until the next launch.
+ * - "unreadable": the library could not be opened, or config.json exists but
+ *   could not be read (locked, no permission) or moved aside, so the app runs
+ *   on defaults and writes no setting until the next launch.
  */
 let configProblem: ConfigProblem | null = null;
-// Whether config.json has been read since launch. Until it has, a file that
-// cannot be read blocks writes for the session: the in-memory state (e.g. the
-// workspaces) started from defaults, and saving it would replace the real file.
-// After it has, a read that fails is a passing lock, and only that save is
-// skipped (see updateConfig).
-let loadedOnce = false;
-// The last config read or saved successfully, served while a later read fails.
+// The last settings read or saved successfully, served while a later read
+// fails (an update check would otherwise lose its throttle, and so on).
 let lastGood: AppConfig | null = null;
+// The library the settings were opened in at startup (openStore), and whether
+// they could not be read there, in which case nothing is written for the
+// session. Opened again when the library's path changes, which only tests do.
+let store: { file: string; blocked: boolean } | null = null;
 
 export function configLoadProblem(): ConfigProblem | null {
+  ensureStore();
   return configProblem;
 }
 
@@ -140,68 +162,144 @@ function defaultConfig(): AppConfig {
   return {
     roots: [],
     activePath: null,
-    collections: [],
     workspaceEmojis: {},
     update: { ...DEFAULT_UPDATE_CONFIG },
     logo: DEFAULT_LOGO,
     autoTag: defaultAutoTagConfig(),
     customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
     cssTheme: null,
+    scanExclusions: emptyScanExclusions(),
   };
 }
 
-export function loadConfig(): AppConfig {
-  // While a read fails mid-session, readers get what was last read rather than
-  // defaults (an update check would otherwise lose its throttle, and so on).
-  return (
-    readConfig() ?? (lastGood ? structuredClone(lastGood) : defaultConfig())
-  );
+function ensureStore(): { file: string; blocked: boolean } {
+  const file = libraryDbPath();
+  if (store?.file !== file) {
+    configProblem = null;
+    lastGood = null;
+    store = { file, blocked: !openStore(file) };
+  }
+  return store;
 }
 
-/** The config, or null when config.json exists but could not be read now. */
-function readConfig(): AppConfig | null {
-  // Blocked for the session: keep to the defaults the app started from.
-  if (configProblem === "unreadable") return defaultConfig();
+/**
+ * Run `fn` on a connection to the settings, opened for it and closed after:
+ * nothing holds the library open between reads (Windows could not delete or
+ * move it aside, and every close checkpoints the WAL). Settings are read and
+ * written rarely enough for the open on each. Null when they are blocked for
+ * the session (see openStore); a connection that fails to open throws.
+ */
+export function withSettings<T>(fn: (db: DB) => T): { value: T } | null {
+  const { file, blocked } = ensureStore();
+  if (blocked) return null;
+  let db: DB;
+  try {
+    db = openSettingsDb(file);
+  } catch (e) {
+    // better-sqlite3 throws a plain TypeError, with no SQLite code, when the
+    // folder is gone (userData removed or unmounted mid-session).
+    throw new SettingsUnavailableError(e);
+  }
+  try {
+    return { value: fn(db) };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Check the settings in the library at startup, importing config.json the
+ * first time. False when they cannot be read, with configProblem set: the app
+ * then runs on defaults rather than write them over what it could not read.
+ */
+function openStore(file: string): boolean {
+  let db: DB;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    db = openSettingsDb(file);
+  } catch (e) {
+    log.error("the settings could not be read from the library", e);
+    configProblem = "unreadable";
+    return false;
+  }
+  try {
+    const imported =
+      db
+        .prepare("SELECT 1 FROM app_settings WHERE key = ?")
+        .get(IMPORTED_KEY) !== undefined;
+    return imported || importConfigJson(db);
+  } catch (e) {
+    log.error("the settings could not be imported into the library", e);
+    configProblem = "unreadable";
+    return false;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Bring config.json's settings into the library, once: recorded in the same
+ * transaction, after which config.json is never read again. The file is left
+ * where it is, for an older version of the app to start from. False when it
+ * exists but cannot be read now: tried again on the next launch.
+ *
+ * A library put back from a copy taken before the import has no record of it,
+ * and imports config.json again, which has not changed since.
+ */
+function importConfigJson(db: DB): boolean {
+  const read = readConfigJson();
+  if (read === null) return false;
+  db.transaction(() => {
+    writeFields(db, read.config, FIELDS);
+    const put = db.prepare(
+      "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    );
+    // Always, as every field is: an import replaces what is stored, and a
+    // config.json without collections (or none at all) has none.
+    put.run(COLLECTIONS_KEY, JSON.stringify(read.collections ?? []));
+    put.run(IMPORTED_KEY, JSON.stringify(Date.now()));
+  })();
+  if (fs.existsSync(configPath())) {
+    log.info("moved the settings from config.json into the library");
+  }
+  return true;
+}
+
+/** config.json's settings, and its collections as they were there. */
+interface ImportedConfig {
+  config: AppConfig;
+  collections?: unknown;
+}
+
+/**
+ * config.json's settings, defaults when there is none (a first launch) or it
+ * could not be parsed and was moved aside, or null when it cannot be read or
+ * moved aside (configProblem says which).
+ */
+function readConfigJson(): ImportedConfig | null {
   const file = configPath();
   let text: string;
   try {
     text = fs.readFileSync(file, "utf8");
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
-      // First launch, or moved aside: a known state, and an empty config.
-      loadedOnce = true;
-      lastGood = defaultConfig();
-      return defaultConfig();
-    }
-    if (loadedOnce) {
-      log.warn(`config.json could not be read (${code ?? "unknown"})`);
-      return null;
-    }
+    if (code === "ENOENT") return { config: defaultConfig() };
     log.error(
-      `config.json could not be read (${code ?? "unknown"}); not writing over it`,
+      `config.json could not be read (${code ?? "unknown"}); not importing it`,
     );
     configProblem = "unreadable";
-    return defaultConfig();
+    return null;
   }
-  let c: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(text);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("not a JSON object");
     }
-    c = parsed as Record<string, unknown>;
+    const c = parsed as Record<string, unknown>;
+    return { config: parseConfig(c), collections: c.collections };
   } catch {
-    // Unparsable mid-session: caught half-written by something else (a hand
-    // edit, a sync tool). The state in memory came from a good read, so treat
-    // it like a read that failed rather than as damage.
-    if (loadedOnce) {
-      log.warn("config.json could not be parsed");
-      return null;
-    }
-    // Unparsable at startup: keep it for recovery, out of the way of the saves
-    // to come. The parse error is not logged: its message quotes the file's
-    // text, and that holds folder names.
+    // Kept for recovery, out of the way. The parse error is not logged: its
+    // message quotes the file's text, and that holds folder names.
     const aside = `${file}.corrupt-${fileTimestamp(new Date())}`;
     try {
       fs.renameSync(file, aside);
@@ -209,33 +307,86 @@ function readConfig(): AppConfig | null {
         `config.json could not be parsed; moved it to ${path.basename(aside)}`,
       );
       configProblem = "moved-aside";
+      return { config: defaultConfig() };
     } catch (moveErr) {
       const code = (moveErr as NodeJS.ErrnoException).code;
       log.error(
-        `config.json could not be parsed or moved aside (${code ?? "unknown"}); not writing over it`,
+        `config.json could not be parsed or moved aside (${code ?? "unknown"}); not importing it`,
       );
       configProblem = "unreadable";
+      return null;
     }
-    loadedOnce = true;
-    lastGood = defaultConfig();
-    return defaultConfig();
   }
-  loadedOnce = true;
-  const config: AppConfig = {
+}
+
+/** The settings as stored: field by field, so one that does not validate
+ *  falls back to its default without taking the others with it. */
+function parseConfig(c: Record<string, unknown>): AppConfig {
+  return {
     roots: Array.isArray(c.roots)
       ? c.roots.filter((x: unknown) => typeof x === "string")
       : [],
     activePath: typeof c.activePath === "string" ? c.activePath : null,
-    collections: parseCollections(c.collections),
     workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
     update: parseUpdateConfig(c.update),
     logo: parseLogo(c.logo),
     autoTag: parseAutoTag(c.autoTag),
     customCss: parseCustomCss(c.customCss),
     cssTheme: parseCssTheme(c.cssTheme),
+    scanExclusions: parseScanExclusions(c.scanExclusions),
   };
-  lastGood = structuredClone(config);
-  return config;
+}
+
+function readStored(db: DB): AppConfig {
+  const values: Record<string, unknown> = {};
+  const rows = db.prepare("SELECT key, value FROM app_settings").all() as {
+    key: string;
+    value: string;
+  }[];
+  for (const { key, value } of rows) {
+    try {
+      values[key] = JSON.parse(value);
+    } catch {
+      log.warn(`the setting ${key} could not be parsed; using its default`);
+    }
+  }
+  return parseConfig(values);
+}
+
+function writeFields(
+  db: DB,
+  config: AppConfig,
+  keys: readonly (keyof AppConfig)[],
+): void {
+  const put = db.prepare(
+    "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  );
+  for (const key of keys) put.run(key, JSON.stringify(config[key]));
+}
+
+/** The settings could not be opened at all (see withSettings). */
+class SettingsUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("the settings could not be opened", { cause });
+  }
+}
+
+/** An error from storage (locked, disk full, gone, …), as opposed to a bug. */
+export const isStorageError = (e: unknown) =>
+  e instanceof SettingsUnavailableError ||
+  errorCode(e)?.startsWith("SQLITE_") === true;
+
+export function loadConfig(): AppConfig {
+  try {
+    const read = withSettings(readStored);
+    if (read === null) return defaultConfig(); // see openStore
+    lastGood = structuredClone(read.value);
+    return read.value;
+  } catch (e) {
+    if (!isStorageError(e)) throw e;
+    log.warn("the settings could not be read", e);
+    return lastGood ? structuredClone(lastGood) : defaultConfig();
+  }
 }
 
 /** 2026-11-10T12:00:00.000Z → 20261110-120000, safe in a file name. */
@@ -340,9 +491,10 @@ function parseUpdateConfig(value: unknown): UpdateConfig {
 }
 
 /**
- * Remove any leftover `config.json.<pid>.tmp` files from a previous run that
- * crashed between writeFileSync and renameSync. Safe to call at startup; the
- * single-instance lock means no other process is mid-write.
+ * Remove any leftover `config.json.<pid>.tmp` files from a run of a version
+ * that still wrote config.json and crashed between writeFileSync and
+ * renameSync. Safe to call at startup; the single-instance lock means no other
+ * process is mid-write.
  */
 export function cleanupStaleTemp(): void {
   try {
@@ -358,48 +510,56 @@ export function cleanupStaleTemp(): void {
   }
 }
 
+/**
+ * Replace every setting with `c`. Only for a whole configuration: a change
+ * goes through updateConfig, so it cannot revert what another owner wrote.
+ */
 export function saveConfig(c: AppConfig): void {
-  if (configProblem === "unreadable") return; // see readConfig
   try {
-    const dest = configPath();
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    // Write to a sibling temp file then rename so a crash mid-write can't leave a
-    // truncated config.json (which would drop all workspaces and collections).
-    // fsync the temp file before renaming: rename is atomic for the directory
-    // entry, but without fsync a power loss can land the rename while the temp's
-    // data blocks are still unflushed, leaving a 0-byte/partial config.json.
-    const tmp = `${dest}.${process.pid}.tmp`;
-    const fd = fs.openSync(tmp, "w");
-    try {
-      fs.writeFileSync(fd, JSON.stringify(c, null, 2));
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.renameSync(tmp, dest);
-    lastGood = structuredClone(c); // what the file now holds
+    const saved = withSettings((db) =>
+      db.transaction(() => writeFields(db, c, FIELDS))(),
+    );
+    if (saved !== null) lastGood = structuredClone(c);
   } catch (e) {
+    if (!isStorageError(e)) throw e;
     log.error("saveConfig failed", e);
   }
 }
 
 /**
- * Atomic read-modify-write of the config. Re-reads the current file, applies
- * `mutator`, and saves — all synchronously, so callers that hold a stale
- * snapshot across an `await` (e.g. the update checker fetching over the network)
- * can't clobber concurrent changes to unrelated fields (roots, collections, …).
- * Pass an `update`-only mutation here rather than spreading an old `loadConfig()`
- * result into `saveConfig`.
+ * Read-modify-write of the settings, in one transaction: `mutator` gets the
+ * settings as stored, and only the fields it changed are written. A caller
+ * that holds a stale snapshot across an `await` (the update checker fetching
+ * over the network) cannot revert concurrent changes to unrelated fields
+ * (roots, autoTag, …), as long as it changes only its own fields here
+ * rather than spreading an old loadConfig() result into saveConfig.
+ *
+ * A write that fails (a full disk) is logged rather than thrown, so a caller
+ * that must know reads the setting back (saveAutoTag).
  */
 export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
-  const current = readConfig();
-  // A read that failed mid-session (a passing lock): saving the change over
-  // defaults would drop everything else, so this one change is not saved.
-  if (current === null) {
-    log.warn("a settings change was not saved: config.json could not be read");
-    return;
+  try {
+    const saved = withSettings((db) =>
+      db
+        .transaction(() => {
+          const current = readStored(db);
+          // Taken before the mutator runs, which may change `current` in place.
+          const before = FIELDS.map((k) => JSON.stringify(current[k]));
+          const changed = mutator(current);
+          writeFields(
+            db,
+            changed,
+            FIELDS.filter((k, i) => JSON.stringify(changed[k]) !== before[i]),
+          );
+          return changed;
+        })
+        .immediate(),
+    );
+    if (saved !== null) lastGood = structuredClone(saved.value);
+  } catch (e) {
+    if (!isStorageError(e)) throw e;
+    log.error("a settings change was not saved", e);
   }
-  saveConfig(mutator(current));
 }
 
 /**
@@ -428,8 +588,13 @@ export function saveAutoTag(config: AutoTagConfig): void {
 
 /** The settings a pass applies, as one comparable value. */
 function engineOf({ rules, keywords, folders }: AutoTagConfig): string {
-  // Typed as the engine, so a field it gains has to be named here too.
-  const engine: Required<AutoTagEngine> = { rules, keywords, folders };
+  // Typed as the engine, so a field it gains has to be named here too. Not
+  // `whole`: how a caller has it run, not a setting.
+  const engine: Required<Omit<AutoTagEngine, "whole">> = {
+    rules,
+    keywords,
+    folders,
+  };
   return JSON.stringify(engine);
 }
 
@@ -450,43 +615,6 @@ export function normalizeDir(p: string): string {
   return normalized;
 }
 
-function parseCollections(value: unknown): UserCollectionConfig[] {
-  if (!Array.isArray(value)) return [];
-  const out: UserCollectionConfig[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== "object") continue;
-    const c = raw as Record<string, unknown>;
-    if (typeof c.id !== "string" || typeof c.name !== "string") continue;
-    const items: UserCollectionItemConfig[] = [];
-    if (Array.isArray(c.items)) {
-      for (const itemRaw of c.items) {
-        if (!itemRaw || typeof itemRaw !== "object") continue;
-        const item = itemRaw as Record<string, unknown>;
-        if (
-          typeof item.workspaceId !== "string" ||
-          typeof item.fileId !== "number"
-        )
-          continue;
-        items.push({
-          workspaceId: item.workspaceId,
-          fileId: item.fileId,
-          addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
-        });
-      }
-    }
-    out.push({
-      id: c.id,
-      name: c.name,
-      emoji: typeof c.emoji === "string" && c.emoji ? c.emoji : undefined,
-      items,
-      createdAt: typeof c.createdAt === "number" ? c.createdAt : 0,
-      updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : 0,
-      ...(c.locked === true ? { locked: true } : {}),
-    });
-  }
-  return out;
-}
-
 function parseEmojiMap(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object") return {};
   const out: Record<string, string> = {};
@@ -494,4 +622,48 @@ function parseEmojiMap(value: unknown): Record<string, string> {
     if (typeof v === "string" && v) out[k] = v;
   }
   return out;
+}
+
+/**
+ * Entry by entry. A pattern that no longer compiles is kept: it is what the
+ * user wrote, the settings show it with its error, and the scan skips it.
+ * A bare string is a regular expression, as patterns were stored before they
+ * had a kind (#529).
+ */
+function parseScanExclusions(value: unknown): ScanExclusions {
+  if (!value || typeof value !== "object") return emptyScanExclusions();
+  const c = value as Record<string, unknown>;
+  const patterns: ExclusionPattern[] = [];
+  for (const raw of Array.isArray(c.patterns) ? c.patterns : []) {
+    const p = parseExclusionPattern(raw);
+    if (p && !patterns.some((q) => samePattern(p, q))) patterns.push(p);
+    if (patterns.length >= MAX_EXCLUSION_PATTERNS) break;
+  }
+  const folders: Record<string, string[]> = {};
+  if (c.folders && typeof c.folders === "object") {
+    for (const [id, list] of Object.entries(c.folders)) {
+      if (!Array.isArray(list)) continue;
+      const kept = list.filter(
+        (f): f is string =>
+          typeof f === "string" && f !== "" && isNormalizedFolderPath(f),
+      );
+      if (kept.length > 0)
+        folders[id] = [...new Set(kept)].slice(0, MAX_EXCLUDED_FOLDERS);
+    }
+  }
+  return { patterns, folders };
+}
+
+function parseExclusionPattern(raw: unknown): ExclusionPattern | null {
+  if (typeof raw === "string")
+    return raw === "" ? null : { kind: "regex", value: raw };
+  if (!raw || typeof raw !== "object") return null;
+  const { kind, value } = raw as Record<string, unknown>;
+  if (
+    typeof value !== "string" ||
+    value === "" ||
+    !PATTERN_KINDS.includes(kind as PatternKind)
+  )
+    return null;
+  return { kind: kind as PatternKind, value };
 }

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import log from "@/lib/logger";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useForgetSelected } from "@/components/SelectionContext";
 import {
@@ -12,12 +11,12 @@ import {
 import { api } from "@/ipc/client";
 import type { FileDetail } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import {
-  dropFromWatchLaterCache,
   forgetDeletedFile,
-  invalidatePlayedSearches,
   invalidateCollectionSearches,
   invalidateTagSearches,
+  patchFileDetailInCache,
   patchFileRowInCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
@@ -108,6 +107,7 @@ export function useDetailMutations({
   const confirm = useConfirm();
   const qc = useQueryClient();
   const forgetSelected = useForgetSelected();
+  const shell = useFileShellActions();
   // Every mutation takes the file it acts on as a variable, set when the
   // action starts. The route keeps this hook mounted across prev/next, and
   // react-query runs a mutation with the options of the latest render: a file
@@ -147,6 +147,11 @@ export function useDetailMutations({
             (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
           ),
         });
+        // Tags belong to the content, the generated ones too, so the
+        // copies' details take the fresh set as it is.
+        patchFileDetailInCache(qc, target.wsId, target.fileId, {
+          tags: fresh.tags,
+        });
       }
     } catch {
       // The tag edit itself succeeded; if the refetch fails (transient IPC
@@ -160,6 +165,7 @@ export function useDetailMutations({
     mutationFn: ({ target, name }: { target: Target; name: string }) =>
       api.fileAddTag(target.fileId, target.wsId, name),
     onSuccess: (_d, { target }) => onTagsChanged(target),
+    meta: { reportsOwnError: true },
     onError: (error, { name }) => {
       // main rejects a name that impersonates a pipeline-owned namespace; any
       // other failure (DB error, unknown workspace) deserves its own message.
@@ -213,21 +219,10 @@ export function useDetailMutations({
   };
 
   const openExternal = () => {
-    const target = here;
     // The external player is about to play this very file: stop it here.
     pauseVideo?.();
     pauseAudio?.();
-    // The main process records the play and consumes the Watch Later entry,
-    // so mirror that once it confirms — it can also refuse (a file gone
-    // missing under the root), and patching regardless would show the file
-    // as consumed when it is not.
-    void api
-      .openExternal(target.fileId, target.wsId)
-      .then(() => {
-        dropFromWatchLaterCache(qc, target.wsId, target.fileId);
-        invalidatePlayedSearches(qc);
-      })
-      .catch((e: unknown) => log.error("open external", e));
+    shell.openExternal(fileId, wsId);
   };
 
   const invalidateCollections = () => {
@@ -247,6 +242,7 @@ export function useDetailMutations({
       invalidateCollections();
       toast.success(t("collection.addedToast", { name: c.name }));
     },
+    meta: { reportsOwnError: true },
     onError: onCollectionError,
   });
   const removeFromCollection = useMutation({
@@ -256,8 +252,24 @@ export function useDetailMutations({
       invalidateCollections();
       toast.success(t("collection.removedFromToast", { name: c.name }));
     },
+    meta: { reportsOwnError: true },
     onError: onCollectionError,
   });
+
+  // The list rows carry the bookmark seconds (the filmstrip draws them); keep
+  // them in step with the detail, as tag edits are. Bookmarks belong to the
+  // content, so the file's copies (same content hash) change with it.
+  const patchRowBookmarks = (target: Target) => {
+    const detail = qc.getQueryData<FileDetail | null>(detailKeyOf(target));
+    if (!detail) return;
+    patchFileRowInCaches(qc, target.wsId, target.fileId, {
+      bookmarkSecs: detail.bookmarks.map((b) => b.sec),
+    });
+    // The copies' details: the target's own already holds the change.
+    patchFileDetailInCache(qc, target.wsId, target.fileId, {
+      bookmarks: detail.bookmarks,
+    });
+  };
 
   const addBookmark = useMutation({
     mutationFn: ({ target, sec }: { target: Target; sec: number }) =>
@@ -275,6 +287,7 @@ export function useDetailMutations({
             }
           : old,
       );
+      patchRowBookmarks(target);
     },
   });
   const removeBookmark = useMutation({
@@ -294,6 +307,7 @@ export function useDetailMutations({
             }
           : old,
       );
+      patchRowBookmarks(target);
     },
   });
 
@@ -334,6 +348,7 @@ export function useDetailMutations({
       // A canceled save dialog resolves with saved=false — stay silent.
       if (res.saved) toast.success(t("player.frameExported"));
     },
+    meta: { reportsOwnError: true },
     onError: () => toast.error(t("player.frameExportFailed")),
   });
 

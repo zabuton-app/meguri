@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let userData = "";
@@ -26,13 +27,19 @@ const { insertFile, LEGACY_METADATA_DDL } =
   await import("../core/__tests__/helpers.js");
 const { openDb, usesOwnMetadata } = await import("../core/db.js");
 const paths = await import("../core/paths.js");
+const { setRendererIndex } = await import("../core/appUrl.js");
 type Core = import("../core/index.js").Core;
 type IpcContext = import("../ipc/context.js").IpcContext;
+
+// handle() answers the app's own page only, so the calls come from there.
+const rendererIndex = path.join(os.tmpdir(), "meguri-app", "index.html");
+setRendererIndex(rendererIndex);
+const fromApp = { senderFrame: { url: pathToFileURL(rendererIndex).href } };
 
 const invoke = (channel: string, payload?: unknown) => {
   const fn = handlers.get(channel);
   if (!fn) throw new Error(`no handler for ${channel}`);
-  return fn({}, payload);
+  return fn(fromApp, payload);
 };
 
 let rootA = "";

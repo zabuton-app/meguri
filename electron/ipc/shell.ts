@@ -3,7 +3,6 @@ import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
-import { TRAY_ICON_BASE64 } from "../core/logoAssets.js";
 import { folderDirInsideRoot, folderPathUnderRoot } from "../core/paths.js";
 import * as q from "../core/queries.js";
 import type { IpcContext } from "./context.js";
@@ -56,7 +55,7 @@ export function registerShellHandlers(ctx: IpcContext): void {
     // Resolve the entire selection before starting the OS drag. A stale or
     // out-of-root entry must not silently turn this into a partial drag.
     const icon = nativeImage.createFromBuffer(
-      Buffer.from(TRAY_ICON_BASE64.dark, "base64"),
+      Buffer.from(ctx.logos.tray.dark, "base64"),
     );
     event.sender.startDrag({
       file: files[0],
@@ -84,15 +83,17 @@ export function registerShellHandlers(ctx: IpcContext): void {
 
   // The folder's path as the user knows it (the configured root, links left
   // as they are), once it is confirmed to be a real directory inside the root.
-  handle("folder_copy_path", ({ workspaceId, path }) => {
+  // clipboard.writeText returns a promise since Electron 45: awaited, so a
+  // failure reaches the renderer instead of going unhandled.
+  handle("folder_copy_path", async ({ workspaceId, path }) => {
     const c = coreById(ws, workspaceId);
     if (!folderDirInsideRoot(c.root, path)) throw new Error("folder not found");
-    clipboard.writeText(folderPathUnderRoot(c.root, path));
+    await clipboard.writeText(folderPathUnderRoot(c.root, path));
   });
 
-  handle("copy_file_path", ({ id, workspaceId }) => {
+  handle("copy_file_path", async ({ id, workspaceId }) => {
     const abs = ensureFileInsideRoot(coreById(ws, workspaceId), id);
-    clipboard.writeText(abs);
+    await clipboard.writeText(abs);
   });
 
   // Open an arbitrary external URL (e.g. the support/donation link). Only
@@ -109,18 +110,15 @@ export function registerShellHandlers(ctx: IpcContext): void {
     if (!allowed.includes(parsed.protocol)) {
       throw new Error("unsupported protocol");
     }
-    void shell.openExternal(parsed.toString());
+    return shell.openExternal(parsed.toString()).catch(() => {
+      // Recorded download URLs can contain credentials in their query strings.
+      throw new Error("could not open external URL");
+    });
   });
 
   handle("open_devtools", () => {
     if (!ctx.isDevMode()) return false;
     ctx.mainWindow()?.webContents.openDevTools({ mode: "right" });
     return true;
-  });
-
-  // Close the window from the renderer (Esc on the bare list screen). Goes
-  // through close() so the tray-hide behavior in the "close" handler applies.
-  handle("window_close", () => {
-    ctx.mainWindow()?.close();
   });
 }

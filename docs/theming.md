@@ -15,6 +15,17 @@ The layers, from bottom to top:
 At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
 theme.
 
+**Random theme on startup** in the Theme section picks a different built-in
+theme with the current light or dark appearance on each start. Like picking a
+built-in theme by hand, it turns off the selected CSS theme; `custom.css` is
+unaffected. A manual pick lasts until the next start. While it is on, the
+window opens on a neutral gray and the picked theme fades in.
+
+Switching built-in themes, or light and dark, cross-fades the window over half
+a second with a View Transition, unless the system asks for reduced motion. A
+`custom.css` can turn this switch fade off with
+`::view-transition-old(root), ::view-transition-new(root) { animation: none; }`.
+
 ![The three layers: built-in theme, CSS theme, custom.css](assets/css-layers.png)
 
 `<userData>` below is, for example, `~/.config/meguri` on Linux.
@@ -63,7 +74,8 @@ without notice.
 - The `--c-*` color variables
 - The `data-slot` values listed below
 - `data-appearance` on `<html>`
-- `aria-current="true"` on the focused item of the grid and the list
+- `aria-current="true"` on the focused item of the grid and the list, and
+  `data-selected` on a selected one
 
 A change to any of these is called out in the release notes.
 
@@ -93,9 +105,14 @@ the whole app.
 | `--c-warn`             | Warnings                                     |
 | `--c-error`            | Errors and destructive actions               |
 | `--c-special`          | Rarely used accent                           |
+| `--c-chrome`           | The frame: the title bar and the rail        |
 
 Text drawn on a `--c-primary` fill uses `--c-bg`, so keep the two readable
 against each other.
+
+`--c-chrome` is optional, and the built-in themes do not set it: left unset,
+it is `--c-surface` with 12% of `--c-fg`. See
+[Parts of the UI](#parts-of-the-ui) for what it covers.
 
 ## Choosing what to override
 
@@ -133,9 +150,12 @@ These parts carry a `data-slot` attribute.
 
 | `data-slot`        | Part                                            |
 | ------------------ | ----------------------------------------------- |
+| `title-bar`        | Title bar across the top                        |
 | `workspace-rail`   | Side rail                                       |
-| `home-header`      | Workspace info header                           |
-| `filter-bar`       | Search and filters                              |
+| `content-panel`    | The panel the screens sit in, beside the rail   |
+| `home-header`      | Path, search and toolbar, in the title bar      |
+| `filter-bar`       | Filters (the search is in the title bar)        |
+| `search-trigger`   | The search in the title bar                     |
 | `status-bar`       | Footer                                          |
 | `audio-player-bar` | Audio player at the bottom                      |
 | `media-card`       | A file in the grid                              |
@@ -144,7 +164,34 @@ These parts carry a `data-slot` attribute.
 | `folder-row`       | A folder in the list                            |
 | `modal-panel`      | Full-size windows (settings, file details, ...) |
 
-The focused item in the grid or the list has `aria-current="true"`.
+The title bar and the rail are one frame, and the content panel is set into
+it with rounded corners. To recolor the frame, set `--c-chrome` rather than
+the background of the title bar or the rail: the frame also fills the corners
+the panel's rounding leaves and the strips right of and below it, which those
+backgrounds do not reach. Left unset, it is `--c-surface` with 12% of
+`--c-fg`.
+
+```css
+html[data-appearance] {
+  --c-chrome: var(--c-bg);
+}
+```
+
+To draw a line between the frame and the content,
+style the panel's border (`border-color`, `border-width`), not a border on the
+title bar or the rail: those are straight, and run past the panel's rounded
+corner as a square. Leave the panel's `background` and `box-shadow` alone: it
+is unpainted so the page shows through, and its shadow paints the frame into
+the corners its rounding leaves.
+
+```css
+[data-slot="content-panel"] {
+  border-color: var(--c-primary);
+}
+```
+
+The focused item in the grid or the list has `aria-current="true"`, and a
+selected one has `data-selected`.
 
 ```css
 [data-slot="media-card"] {
@@ -160,7 +207,7 @@ Variables cascade, so redefining them on a part recolors everything inside
 it — icons, hover states and the active item included:
 
 ```css
-[data-slot="workspace-rail"] {
+[data-slot="status-bar"] {
   --c-bg: #fcee0a;
   --c-surface: #e8da00;
   --c-fg: #0a0a14;
@@ -172,9 +219,13 @@ it — icons, hover states and the active item included:
 Leave the properties that show selection alone, or the selection can become
 invisible:
 
-- Every item draws its selected and focused rings with `box-shadow`.
-- `media-card` also shows selection with its border color.
-- `media-row` and `folder-row` also show selection with their background.
+- Every item draws its focus ring with `box-shadow`.
+- `media-card` shows selection with its border color and its background.
+- `folder-card` shows selection with its border color.
+- `media-row` and `folder-row` show selection with their background.
+
+To change one of them anyway, leave the selected items out with
+`:not([data-selected])`.
 
 Radius, spacing, `outline` and `filter` are free to change.
 
@@ -203,9 +254,9 @@ more.
 ## Fonts and images
 
 Meguri makes no network requests apart from the optional update check. Its
-Content Security Policy blocks `@import` and `url()` pointing at other hosts;
-images from the local machine (`127.0.0.1`) are allowed, because the app
-serves its own media from there. A stylesheet can use:
+Content Security Policy blocks `@import` and `url()` pointing at other hosts,
+and at other services on the local machine: of `127.0.0.1`, only the port the
+app serves its own media from is allowed. A stylesheet can use:
 
 - Fonts installed on the system, by name
 - Fonts and images embedded as `data:` URIs

@@ -11,17 +11,13 @@ import { DATE_RANGES } from "@/lib/dateRanges";
 import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
-  isTagDirective,
+  isSearchDirective,
   joinSearchTokens,
   parseQualifiedTagName,
-  parseTagSearchToken,
+  parseNegatedSearchToken,
+  parseSearchDirective,
   splitSearchTokens,
 } from "@shared/tags";
-import {
-  isHasNoteToken,
-  isNoteDirective,
-  parseNoteSearchToken,
-} from "@shared/noteSearch";
 import type { SearchQuery } from "@/ipc/types";
 import type { Lang, TFunc } from "@/i18n/I18nProvider";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
@@ -31,7 +27,7 @@ import {
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
-import { tagHumanLabel } from "@/lib/tagLabel";
+import { directiveLabel, tagHumanLabel } from "@/lib/tagLabel";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -59,24 +55,6 @@ function without(query: SearchQuery, ...keys: (keyof SearchQuery)[]) {
 function tagLabel(t: TFunc, raw: string): string {
   const { namespace, name } = parseQualifiedTagName(raw);
   return `${t("media.tags")}: ${tagHumanLabel(t, namespace, name)}`;
-}
-
-/**
- * A token that is a condition of its own (`tag:`, `note:`, `has:note`), not
- * text. Wider than what the search box draws as a chip (`tag:` only).
- */
-function isConditionToken(token: string): boolean {
-  return isTagDirective(token) || isNoteDirective(token);
-}
-
-/** The chip label for a directive token, or null for free text. */
-function directiveLabel(t: TFunc, token: string): string | null {
-  const tag = parseTagSearchToken(token);
-  if (tag != null) return tagLabel(t, tag);
-  if (isHasNoteToken(token)) return t("filter.hasNote");
-  const note = parseNoteSearchToken(token);
-  if (note != null) return `${t("media.note")}: "${note}"`;
-  return null;
 }
 
 /**
@@ -109,7 +87,7 @@ export function describeConditions(
     });
 
   const freeText = splitSearchTokens(query.q ?? "").filter(
-    (token) => !isConditionToken(token),
+    (token) => !isSearchDirective(token),
   );
   if (freeText.length)
     out.push({
@@ -119,16 +97,22 @@ export function describeConditions(
       chip: true,
       clear: (q) => {
         const directives = splitSearchTokens(q.q ?? "").filter(
-          isConditionToken,
+          isSearchDirective,
         );
         const rest = joinSearchTokens(directives);
         return rest ? { ...q, q: rest } : without(q, "q");
       },
     });
 
-  splitSearchTokens(query.q ?? "").forEach((token, i) => {
-    const label = directiveLabel(t, token);
-    if (label == null) return;
+  splitSearchTokens(query.q ?? "").forEach((raw, i) => {
+    const { negated, body } = parseNegatedSearchToken(raw);
+    const d = parseSearchDirective(body);
+    if (d === null) return;
+    // A `rating:` or `is:fav` directive is a chip apart from the rating and
+    // favorite controls' below: the two apply independently (#525), and each
+    // clears its own.
+    let label = d.kind === "tag" ? tagLabel(t, d.value) : directiveLabel(t, d);
+    if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,
       label,
@@ -160,15 +144,16 @@ export function describeConditions(
     });
   });
 
-  if (query.kind)
+  if (query.kinds?.length)
     out.push({
       key: "kind",
-      // `kind` is a plain string in the schema, so a saved search can carry a
+      // Kinds are plain strings in the schema, so a saved search can carry a
       // value the UI has no label for. Show it verbatim rather than mislabel it.
-      label: kindLabel(t, query.kind),
+      // One chip for the whole selection, cleared as a whole.
+      label: query.kinds.map((k) => kindLabel(t, k)).join(", "),
       group: "primary",
       chip: true,
-      clear: (q) => without(q, "kind"),
+      clear: (q) => without(q, "kinds"),
     });
 
   if (query.ratingMin)
@@ -240,6 +225,15 @@ export function describeConditions(
           ),
         );
       },
+    });
+
+  if (query.subtitles)
+    out.push({
+      key: "subtitles",
+      label: t("filter.subtitlesChip"),
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "subtitles"),
     });
 
   // Not a narrowing condition, but it is hidden state once the control moves

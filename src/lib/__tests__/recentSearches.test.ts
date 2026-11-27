@@ -74,6 +74,21 @@ describe("parseRecentSearches", () => {
     expect(list).toEqual([{ q: "cat" }, { q: "dog" }]);
   });
 
+  it("reads the single kind of earlier versions as a selection", () => {
+    // Stored before the filter took several kinds; it must keep its condition
+    // and match the same search made now.
+    const list = parseRecentSearches(
+      JSON.stringify([{ kind: "video" }, { kinds: ["video"] }]),
+    );
+    expect(list).toEqual([{ kinds: ["video"] }]);
+  });
+
+  it("does not let an empty kinds widen an old single kind to every kind", () => {
+    expect(
+      parseRecentSearches(JSON.stringify([{ kind: "image", kinds: [] }])),
+    ).toEqual([{ kinds: ["image"] }]);
+  });
+
   it("cleans, dedupes and caps what it reads, keeping the order", () => {
     const stored = [
       { q: "a" },

@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  hashSearchToken,
   isEditableTag,
+  isFavoriteSearchToken,
   isReservedTagName,
+  isSearchDirective,
+  parseHashSearchToken,
+  parseNumericSearchToken,
+  parseNegatedSearchToken,
+  searchDirectiveKey,
   hasOpenQuote,
   joinSearchTokens,
   parseQualifiedTagName,
+  parseRatingSearchToken,
   parseTagSearchToken,
+  ratingSearchText,
   reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
@@ -13,6 +22,8 @@ import {
   tagSearchKey,
   tagSearchToken,
   tidyTagName,
+  parseSearchDirective,
+  SEARCH_DIRECTIVE_PREFIXES,
 } from "@shared/tags";
 
 describe("tidyTagName", () => {
@@ -166,6 +177,23 @@ describe("tagSearchToken", () => {
     expect(tagSearchToken("long")).toBe("tag:long");
   });
 
+  it("keeps the namespace of a tag whose values are free text", () => {
+    // `jazz` can be a manual tag too: the genre alone must not find it.
+    expect(tagSearchToken("jazz", "audio_genre")).toBe("tag:audio_genre:jazz");
+    expect(tagSearchToken("A minor", "audio_key")).toBe(
+      'tag:"audio_key:A minor"',
+    );
+    expect(tagSearchToken("long", "dur")).toBe("tag:long");
+    // Everyday words are no exception: a bare value does not search them.
+    expect(tagSearchToken("fast", "audio_tempo")).toBe("tag:audio_tempo:fast");
+    expect(tagSearchToken("beach", "")).toBe("tag:beach");
+    expect(
+      parseTagSearchToken(
+        splitSearchTokens(tagSearchToken("A minor", "audio_key"))[0],
+      ),
+    ).toBe("audio_key:A minor");
+  });
+
   it("quotes a value with whitespace, doubling an inner quote", () => {
     expect(tagSearchToken("beach house")).toBe('tag:"beach house"');
     expect(tagSearchToken('a "b" c')).toBe('tag:"a ""b"" c"');
@@ -216,6 +244,57 @@ describe("splitSearchTokens / joinSearchTokens", () => {
     expect(joinSearchTokens(["beach", "tag:sea side", "tag:4k"])).toBe(
       'beach tag:"sea side" tag:4k',
     );
+  });
+
+  it("keeps a negation's - outside the quotes (#523)", () => {
+    expect(splitSearchTokens('-tag:"sea side" -"old trip"')).toEqual([
+      "-tag:sea side",
+      "-old trip",
+    ]);
+    expect(joinSearchTokens(["-tag:sea side", "-old trip", "-draft"])).toBe(
+      '-tag:"sea side" -"old trip" -draft',
+    );
+    expect(splitSearchTokens("-tag: beach")).toEqual(["-tag:beach"]);
+  });
+
+  it("round-trips a quoted leading - as text, not a negation (#523)", () => {
+    const tokens = splitSearchTokens('"-intro" " -outro"');
+    expect(tokens.map((t) => parseNegatedSearchToken(t))).toEqual([
+      { negated: false, body: "-intro" },
+      { negated: false, body: "-outro" },
+    ]);
+    expect(joinSearchTokens(tokens)).toBe('"-intro" "-outro"');
+    expect(splitSearchTokens(joinSearchTokens(tokens))).toEqual(tokens);
+  });
+
+  it("keeps a quoted leading - in a directive typed with a space (#523)", () => {
+    expect(splitSearchTokens('tag: "-intro"')).toEqual(["tag:-intro"]);
+    expect(splitSearchTokens('-tag: "-intro"')).toEqual(["-tag:-intro"]);
+  });
+});
+
+describe("parseNegatedSearchToken", () => {
+  it("takes a leading - as a negation of the rest (#523)", () => {
+    expect(parseNegatedSearchToken("-tag:beach")).toEqual({
+      negated: true,
+      body: "tag:beach",
+    });
+    expect(parseNegatedSearchToken("-draft")).toEqual({
+      negated: true,
+      body: "draft",
+    });
+    expect(parseNegatedSearchToken("draft")).toEqual({
+      negated: false,
+      body: "draft",
+    });
+  });
+
+  it("leaves a lone - as text", () => {
+    expect(splitSearchTokens("beach - ")).toEqual(["beach", "-"]);
+    expect(parseNegatedSearchToken("-")).toEqual({
+      negated: false,
+      body: "-",
+    });
   });
 });
 
@@ -333,5 +412,264 @@ describe("isReservedTagName", () => {
   it("honours a caller-supplied reserved set", () => {
     expect(isReservedTagName("studio:a24", ["studio"])).toBe(true);
     expect(isReservedTagName("res:4k", ["studio"])).toBe(false);
+  });
+});
+
+describe("parseHashSearchToken", () => {
+  it("reads a hex prefix of four characters or more, lower-cased", () => {
+    expect(parseHashSearchToken("hash:3FA9")).toBe("3fa9");
+    expect(parseHashSearchToken("HASH:3fa9c1d2")).toBe("3fa9c1d2");
+    expect(parseHashSearchToken("hash:" + "a".repeat(64))).toBe("a".repeat(64));
+  });
+
+  it("leaves short, non-hex and over-long values as free text", () => {
+    expect(parseHashSearchToken("hash:3fa")).toBeNull();
+    expect(parseHashSearchToken("hash:3fag")).toBeNull();
+    expect(parseHashSearchToken("hash:")).toBeNull();
+    expect(parseHashSearchToken("hash:" + "a".repeat(65))).toBeNull();
+    expect(parseHashSearchToken("3fa9c1d2")).toBeNull();
+  });
+
+  it("folds a value typed after a space, as tag: does", () => {
+    expect(splitSearchTokens("hash: 3fa9c1d2 trip")).toEqual([
+      "hash:3fa9c1d2",
+      "trip",
+    ]);
+  });
+
+  it("round-trips through hashSearchToken", () => {
+    expect(parseHashSearchToken(hashSearchToken("3FA9C1D2"))).toBe("3fa9c1d2");
+  });
+});
+
+describe("parseRatingSearchToken", () => {
+  it("reads each comparison, and none as equality (#525)", () => {
+    expect(parseRatingSearchToken("rating:>4")).toEqual({ op: ">", value: 4 });
+    expect(parseRatingSearchToken("rating:>=4")).toEqual({
+      op: ">=",
+      value: 4,
+    });
+    expect(parseRatingSearchToken("rating:<2")).toEqual({ op: "<", value: 2 });
+    expect(parseRatingSearchToken("rating:<=2")).toEqual({
+      op: "<=",
+      value: 2,
+    });
+    expect(parseRatingSearchToken("RATING:3")).toEqual({ op: "=", value: 3 });
+    expect(parseRatingSearchToken("rating:0")).toEqual({ op: "=", value: 0 });
+    expect(parseRatingSearchToken("rating:5")).toEqual({ op: "=", value: 5 });
+  });
+
+  it("leaves a value outside 0 to 5, or another comparison, as free text", () => {
+    for (const token of [
+      "rating:6",
+      "rating:>=6",
+      "rating:-1",
+      "rating:3.5",
+      "rating:05",
+      "rating:=3",
+      "rating:=>3",
+      "rating:!=3",
+      "rating:>",
+      "rating:",
+      "rating:high",
+      "4",
+    ])
+      expect(parseRatingSearchToken(token), token).toBeNull();
+  });
+
+  it("folds a value typed after a space", () => {
+    expect(splitSearchTokens("rating: >=4 trip")).toEqual([
+      "rating:>=4",
+      "trip",
+    ]);
+  });
+
+  it("writes the comparison back as the token does", () => {
+    expect(ratingSearchText({ op: ">=", value: 4 })).toBe(">=4");
+    expect(ratingSearchText({ op: "=", value: 3 })).toBe("3");
+  });
+});
+
+describe("isFavoriteSearchToken", () => {
+  it("reads is:fav in any case, and a value after a space (#525)", () => {
+    expect(isFavoriteSearchToken("is:fav")).toBe(true);
+    expect(isFavoriteSearchToken("IS:Fav")).toBe(true);
+    expect(splitSearchTokens("is: fav trip")).toEqual(["is:fav", "trip"]);
+  });
+
+  it("leaves any other value as free text", () => {
+    expect(isFavoriteSearchToken("is:favorite")).toBe(false);
+    expect(isFavoriteSearchToken("is:played")).toBe(false);
+    expect(isFavoriteSearchToken("is:")).toBe(false);
+    expect(isFavoriteSearchToken("fav")).toBe(false);
+  });
+});
+
+describe("parseNumericSearchToken (#524)", () => {
+  const read = (token: string) => {
+    const num = parseNumericSearchToken(token);
+    return num && [num.field, num.op, num.value];
+  };
+
+  it("reads each comparison, and none as equality", () => {
+    expect(read("width:>3840")).toEqual(["width", ">", 3840]);
+    expect(read("width:>=3840")).toEqual(["width", ">=", 3840]);
+    expect(read("height:<720")).toEqual(["height", "<", 720]);
+    expect(read("height:<=720")).toEqual(["height", "<=", 720]);
+    expect(read("HEIGHT:1080")).toEqual(["height", "=", 1080]);
+  });
+
+  it("reads size units as binary, in any case, and no unit as bytes", () => {
+    expect(read("size:>1gb")).toEqual(["size", ">", 1024 ** 3]);
+    expect(read("size:<1.5MB")).toEqual(["size", "<", 1.5 * 1024 ** 2]);
+    expect(read("size:>=2kb")).toEqual(["size", ">=", 2048]);
+    expect(read("size:500b")).toEqual(["size", "=", 500]);
+    expect(read("size:500")).toEqual(["size", "=", 500]);
+  });
+
+  it("reads duration units and clock times in seconds", () => {
+    expect(read("duration:<30s")).toEqual(["duration", "<", 30]);
+    expect(read("duration:>20m")).toEqual(["duration", ">", 1200]);
+    expect(read("duration:>=1.5h")).toEqual(["duration", ">=", 5400]);
+    expect(read("duration:90")).toEqual(["duration", "=", 90]);
+    expect(read("duration:1:30")).toEqual(["duration", "=", 90]);
+    expect(read("duration:<90:00")).toEqual(["duration", "<", 5400]);
+    expect(read("duration:>1:02:03")).toEqual(["duration", ">", 3723]);
+  });
+
+  it("leaves an unparsable value as free text", () => {
+    for (const token of [
+      "size:",
+      "size:>",
+      "size:big",
+      "size:1tb",
+      "size:1constructor",
+      "size:-1mb",
+      "size:=1mb",
+      "size:>>1mb",
+      "width:1.5",
+      "width:1920px",
+      "height:>1080p",
+      "duration:1:3",
+      "duration:1:60",
+      "duration:1:60:00",
+      "duration:30d",
+      "sizes:>1gb",
+      ">1gb",
+    ]) {
+      expect(parseNumericSearchToken(token)).toBeNull();
+    }
+  });
+
+  it("folds a value typed after a space, as tag: does", () => {
+    expect(splitSearchTokens("size: >1gb trip")).toEqual(["size:>1gb", "trip"]);
+    expect(parseNumericSearchToken("size:>1gb")?.text).toBe(">1gb");
+  });
+});
+
+describe("parseSearchDirective", () => {
+  it("reads each kind once, with what its chip shows (#666)", () => {
+    expect(parseSearchDirective("HASH:3FA9")).toMatchObject({
+      kind: "hash",
+      prefix: "hash",
+      value: "3fa9",
+    });
+    expect(parseSearchDirective("ext:.GIF")).toMatchObject({
+      kind: "ext",
+      prefix: "ext",
+      value: "gif",
+    });
+    expect(parseSearchDirective("size:>1GB")).toMatchObject({
+      kind: "numeric",
+      prefix: "size",
+      value: ">1gb",
+    });
+    // A token as the tokenizer gives it, quotes taken off.
+    expect(
+      parseSearchDirective(splitSearchTokens('tag:"sea side"')[0]),
+    ).toMatchObject({
+      kind: "tag",
+      prefix: "tag",
+      value: "sea side",
+    });
+    expect(parseSearchDirective("beach")).toBeNull();
+    expect(parseSearchDirective("size:big")).toBeNull();
+  });
+
+  it("folds a space after the colon for every prefix it reads (#666)", () => {
+    for (const prefix of SEARCH_DIRECTIVE_PREFIXES) {
+      expect(splitSearchTokens(`${prefix} x`)).toEqual([`${prefix}x`]);
+    }
+  });
+});
+
+describe("searchDirectiveKey / isSearchDirective", () => {
+  it("keys tag and hash directives apart, and folds each as its kind does", () => {
+    expect(searchDirectiveKey("hash:3FA9")).toBe(
+      searchDirectiveKey("hash:3fa9"),
+    );
+    expect(searchDirectiveKey("tag:Beach")).toBe(
+      searchDirectiveKey("tag:beach"),
+    );
+    // A tag named like a hash is a different condition.
+    expect(searchDirectiveKey("tag:3fa9")).not.toBe(
+      searchDirectiveKey("hash:3fa9"),
+    );
+    expect(searchDirectiveKey("3fa9")).toBeNull();
+  });
+
+  it("keys rating: by its comparison and is:fav in any case (#525)", () => {
+    expect(searchDirectiveKey("RATING:>=4")).toBe(
+      searchDirectiveKey("rating:>=4"),
+    );
+    expect(searchDirectiveKey("rating:>=4")).not.toBe(
+      searchDirectiveKey("rating:>4"),
+    );
+    expect(searchDirectiveKey("IS:FAV")).toBe(searchDirectiveKey("is:fav"));
+  });
+
+  it("keys a numeric directive on the value it compares (#524)", () => {
+    expect(searchDirectiveKey("size:>1gb")).toBe(
+      searchDirectiveKey("SIZE:>1024mb"),
+    );
+    expect(searchDirectiveKey("size:>1gb")).not.toBe(
+      searchDirectiveKey("size:>=1gb"),
+    );
+    expect(searchDirectiveKey("width:1920")).not.toBe(
+      searchDirectiveKey("height:1920"),
+    );
+    expect(isSearchDirective("duration:<30s")).toBe(true);
+    expect(isSearchDirective("size:big")).toBe(false);
+  });
+
+  it("keys a negated directive apart from the same one included (#523)", () => {
+    expect(searchDirectiveKey("-tag:Beach")).toBe(
+      searchDirectiveKey("-tag:beach"),
+    );
+    expect(searchDirectiveKey("-tag:beach")).not.toBe(
+      searchDirectiveKey("tag:beach"),
+    );
+    expect(searchDirectiveKey("-ext:GIF")).toBe(searchDirectiveKey("-ext:gif"));
+    expect(searchDirectiveKey("-draft")).toBeNull();
+  });
+
+  it("calls a negated directive a directive, and negated text text (#523)", () => {
+    expect(isSearchDirective("-tag:beach")).toBe(true);
+    expect(isSearchDirective("-hash:3fa9")).toBe(true);
+    expect(isSearchDirective("-ext:gif")).toBe(true);
+    expect(isSearchDirective("-draft")).toBe(false);
+    // Quoted, the - is text, so the rest is no directive either.
+    expect(isSearchDirective(splitSearchTokens('"-tag:beach"')[0])).toBe(false);
+  });
+
+  it("calls both kinds directives, and nothing else", () => {
+    expect(isSearchDirective("tag:beach")).toBe(true);
+    expect(isSearchDirective("hash:3fa9")).toBe(true);
+    expect(isSearchDirective("hash:3f")).toBe(false);
+    expect(isSearchDirective("rating:>=4")).toBe(true);
+    expect(isSearchDirective("rating:6")).toBe(false);
+    expect(isSearchDirective("is:fav")).toBe(true);
+    expect(isSearchDirective("is:played")).toBe(false);
+    expect(isSearchDirective("beach")).toBe(false);
   });
 });

@@ -1,7 +1,8 @@
 import { test, expect } from "./fixtures/app";
 import {
   fileCard,
-  searchInput,
+  searchFor,
+  searchTrigger,
   statusBar,
   waitForIdle,
   expectStarRating,
@@ -15,7 +16,7 @@ test.describe("Home", () => {
     await expect(window.getByText(FIXTURE_FILE)).toBeVisible({
       timeout: 60_000,
     });
-    await expect(statusBar(window)).toContainText("1 files");
+    await expect(statusBar(window)).toContainText("1 file in total");
     await expect(statusBar(window)).toContainText("Idle");
   });
 
@@ -66,14 +67,15 @@ test.describe("Home", () => {
   });
 
   test("filters files by search query", async ({ ready }) => {
-    const input = searchInput(ready);
-    await input.fill("test");
+    await searchFor(ready, "test");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
-    await input.fill("nomatch-xyz");
+    await searchFor(ready, "nomatch-xyz");
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
-    await input.fill("");
+    await searchTrigger(ready)
+      .getByRole("button", { name: "Clear search" })
+      .click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 
@@ -82,13 +84,18 @@ test.describe("Home", () => {
     // fixture reports ready and its completion re-renders the bar out from
     // under the control being clicked.
     await waitForIdle(ready);
-    await ready.getByRole("radio", { name: "Image" }).click();
-    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
-
-    await ready.getByRole("radio", { name: "Video" }).click();
+    const kinds = ready.getByRole("group", { name: "Filter by kind" });
+    await kinds.getByRole("button", { name: "Video" }).click();
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
-    await ready.getByRole("radio", { name: "All" }).click();
+    // Kinds add up: the image fixture shows again alongside videos.
+    await kinds.getByRole("button", { name: "Image" }).click();
+    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
+
+    await kinds.getByRole("button", { name: "Image" }).click();
+    await expect(ready.getByText("No media to display.")).toBeVisible();
+
+    await kinds.getByRole("button", { name: "All" }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 

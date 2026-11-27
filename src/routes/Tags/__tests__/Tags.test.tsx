@@ -133,6 +133,20 @@ describe("Tags screen", () => {
     expect(await screen.findByText("No matching tags.")).toBeTruthy();
   });
 
+  it("shows a load error with a retry instead of the empty state", async () => {
+    mocks.tagsListAll.mockRejectedValue(new Error("db locked"));
+    render();
+    expect(
+      await screen.findByText("Could not load tags. Please try again."),
+    ).toBeTruthy();
+    expect(screen.queryByText("No tags yet.")).toBeNull();
+
+    mocks.tagsListAll.mockResolvedValue(CATALOG);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Manual tags")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("persists the sort choice", async () => {
     render();
     fireEvent.click(await screen.findByText("By name"));
@@ -445,6 +459,6 @@ describe("Tags screen", () => {
   it("warns when the catalog was truncated", async () => {
     mocks.tagsListAll.mockResolvedValue({ ...CATALOG, truncated: true });
     render();
-    expect(await screen.findByText(/showing the top 2000/)).toBeTruthy();
+    expect(await screen.findByText(/showing the top 2,000/)).toBeTruthy();
   });
 });

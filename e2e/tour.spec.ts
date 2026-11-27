@@ -1,5 +1,9 @@
 import { test, expect } from "./fixtures/app";
-import { openSettingsTab, waitForIndexedMedia } from "./fixtures/helpers";
+import {
+  openSettingsTab,
+  searchTrigger,
+  waitForIndexedMedia,
+} from "./fixtures/helpers";
 
 test.describe("Tour", () => {
   test("runs on first launch, can be skipped and does not come back", async ({
@@ -67,7 +71,7 @@ test.describe("Tour", () => {
     await page.reload();
     await waitForIndexedMedia(page);
     await expect(page.locator("html")).toHaveAttribute("lang", "ja");
-    await expect(page.getByPlaceholder("ファイル名・タグを検索")).toBeVisible();
+    await expect(searchTrigger(page)).toContainText("ファイル名・タグを検索");
   });
 
   test("can be replayed from settings", async ({ ready }) => {

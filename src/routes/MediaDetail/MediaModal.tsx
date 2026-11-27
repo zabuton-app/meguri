@@ -18,7 +18,9 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useModalFocus } from "@/hooks/useModalFocus";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { useImmersiveBackdrop } from "@/components/immersiveView";
 import { holdPeekDocked } from "./peekDocked";
 import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
 
@@ -29,7 +31,8 @@ export type ModalSize = "large" | "small";
 // list, the toolbar and the bottom player bar visible and usable.
 export type Presentation = "modal" | "peek";
 
-// Shared localStorage key: MediaDetail and Discover persist one common size.
+// Shared localStorage key: MediaDetail, Discover and the playlist player
+// persist one common size.
 export const MODAL_SIZE_KEY = "meguri.media.modalSize";
 // Remembered separately from the size, so switching to the peek and back lands
 // on the modal size that was last chosen.
@@ -51,6 +54,7 @@ export function MediaModal({
   presentation = "modal",
   fullscreen = false,
   containerRef,
+  titleId,
   t,
   children,
 }: {
@@ -59,6 +63,8 @@ export function MediaModal({
   presentation?: Presentation;
   fullscreen?: boolean;
   containerRef?: Ref<HTMLDivElement>;
+  /** The id TopBar puts on the title, for aria-labelledby. */
+  titleId?: string;
   t: TFunc;
   children: ReactNode;
 }) {
@@ -88,11 +94,17 @@ export function MediaModal({
   const panelRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
   const peek = usePeekResize(docked, panelRef);
+  // The peek leaves the list beside it usable, so only the modal holds focus.
+  useModalFocus(panelRef, { active: !isPeek });
   // Tell Home the list is in use beside the sheet (see peekDocked.ts).
   useLayoutEffect(() => {
     if (!docked) return;
     return holdPeekDocked();
   }, [docked]);
+  // The modal covers the whole window, title bar included, as Discover and
+  // the player do: the bar's window buttons step aside meanwhile. The peek
+  // sits beside the list, below the bar.
+  const backdrop = useImmersiveBackdrop(!isPeek);
 
   // One tree shape for both presentations: only classes and ARIA change, so
   // switching modal ↔ peek re-styles the frame without remounting what is
@@ -104,7 +116,7 @@ export function MediaModal({
   // string).
   // The modal clips its content to its rounded corners; the peek must not
   // clip, or the grip that straddles its left edge loses its outer half.
-  const innerBase = "flex min-h-0 flex-col bg-bg";
+  const innerBase = "flex min-h-0 flex-col bg-bg outline-none";
   let outerClass: string;
   let innerClass: string;
   if (isPeek) {
@@ -118,14 +130,14 @@ export function MediaModal({
       fullscreen ? "" : " border-l border-border"
     }`;
   } else {
-    const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
+    const outerBase = `${backdrop} z-50 flex bg-black/70 backdrop-blur-sm`;
     outerClass =
       size === "small"
         ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`
         : `${outerBase} p-2 sm:p-4 md:p-6`;
     innerClass = fullscreen
       ? `${innerBase} relative w-full overflow-hidden`
-      : `${innerBase} relative w-full overflow-hidden rounded-xl border border-border shadow-2xl${
+      : `${innerBase} relative w-full overflow-hidden rounded-window border border-border shadow-2xl${
           size === "small" ? " max-w-4xl" : ""
         }`;
   }
@@ -136,9 +148,11 @@ export function MediaModal({
       onClick={isPeek ? undefined : onClose}
       role={isPeek ? undefined : "dialog"}
       aria-modal={isPeek ? undefined : "true"}
+      aria-labelledby={isPeek ? undefined : titleId}
     >
       <div
         ref={panelRef}
+        tabIndex={-1}
         data-slot="modal-panel"
         className={innerClass}
         // Inline rather than a Tailwind class: the ceiling is derived from
@@ -153,6 +167,7 @@ export function MediaModal({
         }
         onClick={(e) => e.stopPropagation()}
         role={isPeek ? "dialog" : undefined}
+        aria-labelledby={isPeek ? titleId : undefined}
         data-presentation={presentation}
       >
         {docked && (
@@ -174,7 +189,7 @@ export function MediaModal({
           >
             <span
               aria-hidden
-              className="flex h-6 w-4 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted group-hover/handle:border-primary group-hover/handle:text-fg group-focus-visible/handle:border-primary group-focus-visible/handle:text-fg"
+              className="flex h-6 w-4 shrink-0 items-center justify-center rounded-control border border-border bg-bg text-muted group-hover/handle:border-primary group-hover/handle:text-fg group-focus-visible/handle:border-primary group-focus-visible/handle:text-fg"
             >
               <EllipsisVertical className="size-3.5" />
             </span>
@@ -189,6 +204,7 @@ export function MediaModal({
 export function TopBar({
   onClose,
   title,
+  titleId,
   onPrev,
   onNext,
   canPrev,
@@ -205,6 +221,8 @@ export function TopBar({
 }: {
   onClose: () => void;
   title?: string;
+  /** Put on the title so the frame can name itself by it (see MediaModal). */
+  titleId?: string;
   onPrev?: () => void;
   onNext?: () => void;
   canPrev?: boolean;
@@ -233,8 +251,7 @@ export function TopBar({
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onPrev}
             disabled={!canPrev}
             aria-label={t("media.prev")}
@@ -246,8 +263,7 @@ export function TopBar({
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onNext}
             disabled={!canNext}
             aria-label={t("media.next")}
@@ -261,6 +277,7 @@ export function TopBar({
       )}
       {title && (
         <span
+          id={titleId}
           className="select-text truncate text-sm font-medium text-fg"
           title={title}
         >
@@ -273,8 +290,7 @@ export function TopBar({
         {onOpenPlaylist && (
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onOpenPlaylist}
             disabled={!canOpenPlaylist}
             aria-label={t("media.playAsPlaylist")}
@@ -289,8 +305,7 @@ export function TopBar({
           onSetPresentation && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2"
+              size="compact"
               onClick={() => onSetPresentation("modal")}
               aria-label={t("media.openAsModal")}
               title={t("media.openAsModal")}
@@ -303,8 +318,7 @@ export function TopBar({
             {onToggleSize && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="compact"
                 onClick={onToggleSize}
                 aria-label={toggleLabel}
                 aria-pressed={isSmall}
@@ -316,8 +330,7 @@ export function TopBar({
             {onSetPresentation && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="compact"
                 onClick={() => onSetPresentation("peek")}
                 aria-label={t("media.openAsPeek")}
                 title={t("media.openAsPeek")}
@@ -329,8 +342,7 @@ export function TopBar({
         )}
         <Button
           variant="ghost"
-          size="sm"
-          className="h-7 px-2"
+          size="compact"
           onClick={onClose}
           title={`${t("common.close")} (Esc)`}
         >

@@ -40,7 +40,7 @@ export function ruleDisplayName(t: TFunc, rule: TagRule): string {
 export const MONO = "font-mono";
 
 export const FIELD =
-  "h-[30px] rounded-md border border-border-strong bg-transparent px-2 text-[13px] text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring";
+  "h-8 rounded-control border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring";
 
 /** Rows drawn per list at a time: a page of it, or all a preview shows. */
 export const MAX_ROWS = 200;

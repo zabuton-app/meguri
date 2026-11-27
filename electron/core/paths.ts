@@ -49,14 +49,42 @@ export function backupDbPathForDataDir(dataDir: string): string {
  * Drive-root edge case ("C:\\") already ends with a separator, so don't double up.
  */
 export function isInsideRoot(abs: string, root: string): boolean {
-  let normalizedAbs: string;
-  let normalizedRoot: string;
+  let realAbs: string;
+  let realRoot: string;
   try {
-    normalizedAbs = fs.realpathSync(abs);
-    normalizedRoot = fs.realpathSync(root);
+    // On macOS the JS realpath can preserve different spellings of the same
+    // path. Native realpath returns the spelling on disk, including on
+    // case-sensitive volumes where differently cased folders are distinct.
+    const realpath =
+      process.platform === "darwin" ? fs.realpathSync.native : fs.realpathSync;
+    realAbs = realpath(abs);
+    realRoot = realpath(root);
   } catch {
     return false;
   }
+  return isInsideRealRoot(realAbs, realRoot);
+}
+
+/**
+ * The path isInsideRoot compares, resolved without blocking the main process:
+ * for checks made on every media server request, where the root may be on a
+ * network share.
+ */
+export function realpathForRootCheck(p: string): Promise<string> {
+  // The same resolution as isInsideRoot: native on macOS (fs.promises.realpath
+  // has fs.realpath.native's semantics), the JS realpath elsewhere.
+  return process.platform === "darwin"
+    ? fs.promises.realpath(p)
+    : realpathJs(p);
+}
+
+/**
+ * isInsideRoot's comparison, for a path and a root already resolved the way
+ * isInsideRoot resolves them (realpathForRootCheck, when done asynchronously).
+ */
+export function isInsideRealRoot(realAbs: string, realRoot: string): boolean {
+  let normalizedAbs = realAbs;
+  let normalizedRoot = realRoot;
   // Windows filesystems are case-insensitive, so a drive-letter or folder
   // casing mismatch between the DB path and the configured root must not
   // reject a file that is genuinely inside the root.

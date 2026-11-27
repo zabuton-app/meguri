@@ -1,15 +1,19 @@
 // Everything that reacts to the selection: the floating bar, the bulk tag
-// dialog, and the keys that drive both.
+// dialog, the image comparison, and the keys that drive them.
 //
 // A component of its own because Home provides the selection context and so
 // cannot consume it — this sits just inside the provider, where the bar has to
 // live anyway (it is positioned against the list area).
 import { useCallback, useEffect, useState } from "react";
 import { BulkTagDialog } from "@/components/BulkTagDialog";
+import { CompareView } from "@/compare/CompareView";
+import type { FileRow } from "@/ipc/types";
 import { MAX_BULK_FILES } from "@shared/tags";
 import { SelectionBar } from "@/components/SelectionBar";
+import { canCompare } from "@/compare/canCompare";
 import { useSelection } from "@/components/SelectionContext";
 import { isSelectAllKey } from "@/hooks/useSelectAllGuard";
+import { isTyping } from "@/lib/keyTarget";
 
 interface Props {
   /**
@@ -23,6 +27,11 @@ interface Props {
 export function SelectionLayer({ active }: Props) {
   const selection = useSelection();
   const [tagsOpen, setTagsOpen] = useState(false);
+  // The pair is kept as it was when the view opened: the selection can change
+  // underneath (a refresh after an edit elsewhere), the view should not.
+  const [comparing, setComparing] = useState<
+    readonly [FileRow, FileRow] | null
+  >(null);
 
   // Leaving selection mode closes the dialog with it: keeping it open over an
   // empty selection, or having it reappear the next time selection mode starts,
@@ -35,13 +44,9 @@ export function SelectionLayer({ active }: Props) {
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
-      if (typing || tagsOpen) return;
+      // No check for the comparison here: it is an immersive view, which
+      // turns `active` off (Home's navActive), and this listener with it.
+      if (isTyping() || tagsOpen) return;
 
       // Shared with useSelectAllGuard, which suppresses the browser default
       // for the same chord: matching on the produced character rather than the
@@ -86,8 +91,15 @@ export function SelectionLayer({ active }: Props) {
     <>
       <SelectionBar
         onEditTags={() => setTagsOpen(true)}
+        onCompare={() => {
+          if (canCompare(selection))
+            setComparing([selection.rows[0], selection.rows[1]]);
+        }}
         onExit={exitSelection}
       />
+      {comparing && (
+        <CompareView rows={comparing} onClose={() => setComparing(null)} />
+      )}
       {/* Mounted only while open so each pass starts from a clean staged edit. */}
       {tagsOpen && (
         <BulkTagDialog

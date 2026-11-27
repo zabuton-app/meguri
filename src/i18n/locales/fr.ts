@@ -1,14 +1,20 @@
 // Catalogue français. Doit couvrir exactement le même ensemble de clés que ja.ts (imposé par le type).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const fr: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
+export const fr: Catalog = {
   // common
   "common.close": "Fermer",
+  "common.retry": "Réessayer",
   "common.cancel": "Annuler",
   "common.ok": "OK",
+  "common.actionFailed": "Impossible d'effectuer l'action",
+  "common.experimental":
+    "Expérimental : peut changer ou disparaître dans une version future",
+
+  // window
+  "window.minimize": "Réduire",
+  "window.maximize": "Agrandir",
+  "window.restore": "Restaurer",
 
   // kind
   "kind.video": "Vidéo",
@@ -33,6 +39,9 @@ export const fr: Record<TranslationKey, string> = {
   "settings.light": "Clair",
   "settings.dark": "Sombre",
   "settings.theme": "Thème",
+  "settings.randomThemeOnStartup": "Thème aléatoire au démarrage",
+  "settings.randomThemeOnStartupDesc":
+    "Choisit un autre thème intégré avec l'apparence actuelle à chaque démarrage. Désactive le thème CSS sélectionné.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Passer au mode clair",
@@ -48,6 +57,8 @@ export const fr: Record<TranslationKey, string> = {
   "settings.scenes": "Miniatures de scène",
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
+  "settings.filmstripFrames": "Images de la pellicule",
+  "settings.filmstripFramesDesc": "Images par ligne dans la vue pellicule.",
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
@@ -63,6 +74,12 @@ export const fr: Record<TranslationKey, string> = {
   "settings.listThumbSizeSmall": "Petite",
   "settings.listThumbSizeMedium": "Moyenne",
   "settings.listThumbSizeLarge": "Grande",
+  "settings.windowButtons": "Boutons de fenêtre",
+  "settings.windowButtonsDesc":
+    "Où placer les boutons réduire, agrandir et fermer. Masquez-les si un gestionnaire de fenêtres (en mosaïque, par exemple) s’en charge",
+  "settings.windowButtonsLeft": "Gauche",
+  "settings.windowButtonsRight": "Droite",
+  "settings.windowButtonsNone": "Aucun",
   "settings.emojiStyle": "Style des émojis",
   "settings.emojiStyleDesc":
     "Change l'apparence des icônes emoji et des émojis dans le texte.",
@@ -80,6 +97,75 @@ export const fr: Record<TranslationKey, string> = {
     "Applique custom.css par-dessus le thème. Les modifications prennent effet dès l'enregistrement du fichier.",
   "settings.customCssOpen": "Ouvrir le fichier",
   "settings.customCssOpenError": "Impossible d'ouvrir custom.css.",
+  "settings.tabScan": "Analyse",
+  "settings.scanExclusions": "Exclure par motif",
+  "settings.scanExclusionsDesc":
+    "Fichiers et dossiers exclus des analyses dans tous les espaces de travail. La casse est ignorée.",
+  "settings.scanExclusionsNextScan":
+    "L'enregistrement masque les fichiers indexés couverts par un motif. Les fichiers d'un motif retiré reviennent à la prochaine analyse.",
+  "settings.scanExclusionsSave": "Enregistrer",
+  "settings.scanExclusionsSaved": "Exclusions d'analyse enregistrées.",
+  "settings.scanExclusionsSaveError":
+    "Impossible d'enregistrer les exclusions d'analyse.",
+  "settings.scanExclusionsPattern": "Motif {n}",
+  "settings.scanExclusionsRemove": "Supprimer le motif {n}",
+  "settings.scanExclusionsAdd": "Motif à ajouter",
+  "settings.scanExclusionsNone": "Aucun motif.",
+  "settings.scanExclusionsPresets": "Courants :",
+  "settings.scanExclusionsPresetAdd": "Utiliser {pattern}",
+  "settings.scanExclusionsKind": "Correspondance par",
+  "settings.scanExclusionsKindName": "Nom",
+  "settings.scanExclusionsKindContains": "Contient",
+  "settings.scanExclusionsKindRegex": "Expression régulière",
+  "settings.scanExclusionsKindNameHint":
+    "Exclut les fichiers et dossiers portant ce nom, à toute profondeur ; un dossier inclut son contenu. * remplace n'importe quel texte (*.tmp). Avec un / (work/private, /private), c'est un chemin depuis le dossier de l'espace de travail ; terminé par / (private/), seulement des dossiers.",
+  "settings.scanExclusionsKindContainsHint":
+    "Exclut tout ce dont le chemin contient ce texte, même au sein d'un nom (temp correspond aussi à attempt.mp4).",
+  "settings.scanExclusionsKindRegexHint":
+    "Une expression régulière, comparée au chemin depuis le dossier de l'espace de travail. Le chemin d'un dossier se termine par /.",
+  "settings.scanExclusionsAddAction": "Ajouter",
+  "settings.scanExclusionsDuplicate": "Ce motif est déjà dans la liste.",
+  "settings.scanExclusionsPreviewHint":
+    "Saisissez un motif pour voir les fichiers déjà listés qui correspondent.",
+  "settings.scanExclusionsPreviewLoading":
+    "Recherche des fichiers correspondants…",
+  "settings.scanExclusionsPreviewError":
+    "Impossible de rechercher les fichiers correspondants.",
+  "settings.scanExclusionsPreviewNone":
+    "Il ne correspond à aucun fichier listé.",
+  "settings.scanExclusionsPreviewCount": {
+    one: "{count} fichier correspond. Il est masqué une fois le motif ajouté et enregistré.",
+    other:
+      "{count} fichiers correspondent. Ils sont masqués une fois le motif ajouté et enregistré.",
+  },
+  "settings.scanExclusionsPreviewList": "Fichiers correspondants",
+  "settings.scanExclusionsPreviewMore": {
+    one: "et {count} autre",
+    other: "et {count} autres",
+  },
+  "settings.scanExclusionsTestTimedOut":
+    "Ce motif n'a pas abouti à temps. Il bloquerait les analyses : il ne peut pas être ajouté.",
+  "settings.folderExclusions": "Exclure par dossier",
+  "settings.folderExclusionsDesc":
+    "Par espace de travail, seulement les dossiers listés. Ajoutez-en un par un clic droit sur un dossier dans la vue par dossiers.",
+  "settings.folderExclusionsCount": {
+    one: "{count} dossier",
+    other: "{count} dossiers",
+  },
+  "settings.folderExclusionsNone": "Aucun",
+  "settings.folderExclusionsNotFound": {
+    one: "{count} introuvable",
+    other: "{count} introuvables",
+  },
+  "settings.folderExclusionsManage": "Gérer",
+  "settings.folderExclusionsManageLabel": "Gérer les dossiers exclus de {name}",
+  "settings.folderExclusionsLoadError":
+    "Impossible de lire les dossiers exclus.",
+  "settings.folderExclusionsNoWorkspaces": "Aucun espace de travail.",
+  "settings.scanExclusionsGlobal": "Global",
+  "settings.folderExclusionsPerWorkspace": "Par espace de travail",
+  "settings.scanExclusionsLoadError":
+    "Impossible de lire les exclusions de l'analyse.",
   "settings.logo": "Logo de l'application",
   "settings.logoDesc":
     "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",
@@ -97,7 +183,7 @@ export const fr: Record<TranslationKey, string> = {
   "settings.update": "Mises à jour",
   "settings.updateDesc": "Vérifier si une version plus récente est disponible.",
   "settings.updateCheckNow": "Vérifier maintenant",
-  "settings.updateAuto": "Vérifier automatiquement au démarrage",
+  "settings.updateAuto": "Vérifier automatiquement",
   "update.available": "La version {version} est disponible",
   "update.availableDesc": "Version actuelle : {current}",
   "update.view": "Ouvrir la version",
@@ -112,7 +198,7 @@ export const fr: Record<TranslationKey, string> = {
   "libraryMerge.progress": "{done} / {total} espaces de travail",
   "libraryMerge.failed": "Certains espaces de travail n'ont pas pu être migrés",
   "libraryMerge.failedDesc":
-    "{list}\nIls fonctionnent comme avant. Meguri réessaiera au prochain lancement.",
+    "{list}\nIls fonctionnent comme avant. {app} réessaiera au prochain lancement.",
   "libraryMerge.failedItem": "{name} : {reason}",
   "libraryMerge.reason.diskFull":
     "Le disque est plein. Libérez de l'espace, puis réessayez.",
@@ -123,17 +209,17 @@ export const fr: Record<TranslationKey, string> = {
   "libraryMerge.reason.open": "Sa base de données n'a pas pu être ouverte.",
   "libraryMerge.retry": "Réessayer",
   "library.restored":
-    "Votre bibliothèque était endommagée : Meguri a restauré la copie du {date}",
+    "Votre bibliothèque était endommagée : {app} a restauré la copie du {date}",
   "library.restoredDesc":
-    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
+    "Les favoris, notes, tags, espaces de travail, collections, réglages et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "config.movedAside":
-    "Le fichier de réglages (config.json) était endommagé : Meguri a démarré avec les réglages par défaut",
+    "Le fichier de réglages (config.json) était endommagé : {app} a démarré avec les réglages par défaut",
   "config.movedAsideDesc":
     "Vos espaces de travail et collections sont conservés dans le fichier endommagé, enregistré sous config.json.corrupt-<date> dans le même dossier.",
   "config.unreadable":
-    "Meguri n’a pas pu lire le fichier de réglages (config.json) et fonctionne avec les réglages par défaut",
+    "{app} n’a pas pu lire vos réglages et fonctionne avec les réglages par défaut",
   "config.unreadableDesc":
-    "Le fichier n’a pas été modifié. Vérifiez qu’aucune autre application ne l’utilise, puis redémarrez Meguri.",
+    "Vos réglages n’ont pas été modifiés. Vérifiez qu’aucune autre application ne les utilise, puis redémarrez {app}.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",
@@ -145,6 +231,30 @@ export const fr: Record<TranslationKey, string> = {
   "about.license": "Licence",
   "about.source": "Source",
   "about.fullDependencies": "Voir toutes les dépendances (package.json)",
+  "crash.crashed": "{app} a planté la dernière fois",
+  "crash.uncleanExit": "{app} ne s’est pas fermé normalement la dernière fois",
+  "crash.noticeDesc":
+    "Consultez le rapport et, si vous le souhaitez, signalez-le sur GitHub. Rien n’est envoyé automatiquement.",
+  "crash.viewReport": "Voir le rapport",
+  "crash.dismiss": "Ignorer",
+  "crash.reportTitle": "Rapport de plantage",
+  "crash.reportDesc":
+    "Relisez-le avant de le partager. « Signaler sur GitHub » copie le rapport et ouvre un nouveau ticket ; collez-y le rapport.",
+  "crash.copy": "Copier",
+  "crash.copied": "Rapport copié",
+  "crash.copyFailed": "Impossible de copier le rapport",
+  "crash.reportOnGitHub": "Signaler sur GitHub",
+  "crash.title": "Rapports de plantage",
+  "crash.desc":
+    "Rapports des dernières sessions terminées anormalement. Ils restent sur cet ordinateur et ne sont jamais envoyés automatiquement.",
+  "crash.none": "Aucun rapport de plantage.",
+  "crash.openFolder": "Ouvrir le dossier",
+  "crash.openFolderFailed": "Impossible d’ouvrir le dossier",
+  "crash.view": "Voir",
+  "crash.delete": "Supprimer",
+  "crash.deleteFailed": "Impossible de supprimer le rapport",
+  "crash.kindCrashed": "Plantage",
+  "crash.kindUncleanExit": "Fermeture anormale",
   "keybinding.normal": "Normal",
   "keybinding.vim": "Vim",
   "keybinding.emacs": "Emacs",
@@ -152,6 +262,7 @@ export const fr: Record<TranslationKey, string> = {
   // home
   "home.noDirectory": "(Aucun dossier sélectionné)",
   "home.scan": "Analyser",
+  "home.moreTools": "Plus",
   "home.initError": "Erreur d'initialisation : {msg}",
   "home.initErrorSchemaMismatchHelp":
     "Le format de la base de données ne correspond peut-être pas à cette version de l'application. Supprimez cet espace de travail depuis la barre latérale gauche, puis enregistrez-le à nouveau.",
@@ -173,31 +284,42 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanCanceled": "Scan annulé",
   "home.escCloseHint": "Appuyez à nouveau sur Échap pour fermer la fenêtre",
   "home.scanError": "Une erreur s'est produite pendant le scan",
+  "home.scanExclusionStuck":
+    "Un motif d'exclusion de l'analyse a mis trop de temps à s'exécuter",
+  "home.scanExclusionStuckDesc":
+    "Rien n'a été analysé. Modifiez-le ou supprimez-le dans Paramètres → Analyse.",
   "home.scanRootUnreadable":
     "Le dossier de l’espace de travail est inaccessible",
   "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
   "home.scanRootUnreadableDesc":
-    "Vérifiez que le dossier n’a pas été déplacé ou supprimé, que son disque ou partage réseau est connecté et que Meguri peut le lire, puis relancez le scan. La liste des fichiers a été laissée telle quelle.",
-  "home.scanSkipped": "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s)",
-  "home.scanSkippedNamed":
-    "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s) dans « {name} »",
+    "Vérifiez que le dossier n’a pas été déplacé ou supprimé, que son disque ou partage réseau est connecté et que {app} peut le lire, puis relancez le scan. La liste des fichiers a été laissée telle quelle.",
+  "home.scanSkipped": {
+    one: "{count} dossier ou fichier illisible ignoré",
+    other: "{count} dossiers ou fichiers illisibles ignorés",
+  },
+  "home.scanSkippedNamed": {
+    one: "{count} dossier ou fichier illisible ignoré dans « {name} »",
+    other: "{count} dossiers ou fichiers illisibles ignorés dans « {name} »",
+  },
   "home.scanSkippedDesc":
-    "Meguri n’a peut-être pas l’autorisation de les lire, ou un autre programme les utilise. Cette partie de la liste des fichiers a été laissée telle quelle, et le prochain scan réessaiera.",
+    "{app} n’a peut-être pas l’autorisation de les lire, ou un autre programme les utilise. Cette partie de la liste des fichiers a été laissée telle quelle, et le prochain scan réessaiera.",
   "home.scanStartFailed": "Impossible de démarrer le scan",
   "home.scanAlreadyRunning": "Un scan est déjà en cours",
 
   // command menu
   "command.title": "Menu de commandes",
-  "command.placeholder": "Rechercher des commandes...",
+  "command.placeholder": "Rechercher des fichiers ou saisir une commande...",
   "command.empty": "Aucune commande correspondante.",
   "command.groupNavigation": "Navigation",
   "command.groupWorkspace": "Espace de travail",
   "command.groupView": "Affichage",
-  "command.focusSearch": "Cibler la recherche",
   "command.openDevTools": "Ouvrir la console développeur",
   "command.shortcutHint": "Ouvrir avec {shortcut}",
   "command.groupFile": "Fichier",
-  "command.selectedFiles": "{count} sélectionnés",
+  "command.selectedFiles": {
+    one: "{count} sélectionné",
+    other: "{count} sélectionnés",
+  },
   "command.rating": "Changer la note…",
   "command.ratingStars": "{rating} étoiles",
   "command.ratingNone": "Aucune note",
@@ -211,6 +333,13 @@ export const fr: Record<TranslationKey, string> = {
   "command.pageCollections": "Collections",
   "command.ratingPlaceholder": "Tapez 0–5 pour choisir...",
   "command.collectionPlaceholder": "Rechercher des collections...",
+  "command.workspacePlaceholder": "Passer à un espace de travail...",
+  "command.collectionOpenPlaceholder": "Ouvrir une collection...",
+  "command.searchInPlaceholder":
+    "Saisissez une recherche dans {name}, ou appuyez sur Entrée pour l'ouvrir",
+  "command.openItem": "Ouvrir {name}",
+  "command.searchIn": "Rechercher « {q} » dans {name}",
+  "command.clearFilters": "Effacer tous les filtres",
   "command.groupRecent": "Recherches récentes",
   "command.clearRecent": "Effacer les recherches récentes",
   "command.more": "{count} de plus · tapez pour filtrer",
@@ -219,10 +348,12 @@ export const fr: Record<TranslationKey, string> = {
   // filter
   "filter.searchHint":
     'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage". note:pexels trouve les fichiers dont le mémo contient le texte, et has:note ceux qui ont un mémo.',
+  "filter.hasNote": "Avec un mémo",
+  "filter.openSearch": "Rechercher ou lancer une commande",
+  "filter.clearSearch": "Effacer la recherche",
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
   "filter.tagElsewhere": "autres espaces de travail seulement",
-  "filter.hasNote": "Avec un mémo",
   "filter.all": "Tout",
   "filter.played": "Lu",
   "filter.unplayed": "Non lu",
@@ -236,11 +367,23 @@ export const fr: Record<TranslationKey, string> = {
   "filter.dateFrom": "Du",
   "filter.dateTo": "Au",
   "filter.more": "Autres critères",
-  "filter.moreActive": "Autres critères ({count} actifs)",
+  "filter.moreActive": {
+    one: "Autres critères ({count} actif)",
+    other: "Autres critères ({count} actifs)",
+  },
+  "filter.hashChip": "Empreinte du contenu",
+  "filter.extChip": "Extension",
+  "filter.sizeChip": "Taille",
+  "filter.durationChip": "Durée",
+  "filter.widthChip": "Largeur",
+  "filter.heightChip": "Hauteur",
+  "filter.excludeChip": "Exclure",
   "filter.kindFilter": "Filtrer par type",
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
   "filter.otherSection": "Autres",
+  "filter.subtitles": "Afficher uniquement les vidéos sous-titrées",
+  "filter.subtitlesChip": "Sous-titres",
 
   // smart collections
   "smartCollection.title": "Collections intelligentes",
@@ -257,6 +400,18 @@ export const fr: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "Fichier introuvable.",
+  "downloadOrigin.title": "Origine du téléchargement",
+  "downloadOrigin.website": "Site web",
+  "downloadOrigin.recorded": "URL enregistrées",
+  "downloadOrigin.download": "URL de téléchargement",
+  "downloadOrigin.referrer": "URL de la page d’origine",
+  "downloadOrigin.other": "Autre URL enregistrée",
+  "downloadOrigin.copy": "Copier",
+  "downloadOrigin.copyLabel": "Copier {label}",
+  "downloadOrigin.openLabel": "Ouvrir {label}",
+  "downloadOrigin.copied": "URL copiée dans le presse-papiers",
+  "downloadOrigin.copyFailed": "Impossible de copier l’URL.",
+  "downloadOrigin.openFailed": "Impossible d’ouvrir l’URL.",
   "media.openExternal": "Ouvrir avec une application externe",
   "media.openExternalFailed": "Impossible d’ouvrir dans l’application externe",
   "fileMenu.open": "Ouvrir",
@@ -284,12 +439,15 @@ export const fr: Record<TranslationKey, string> = {
   "media.moreActions": "Autres actions",
   "media.prev": "Fichier précédent",
   "media.next": "Fichier suivant",
+  "media.zoomIn": "Zoom avant",
+  "media.zoomOut": "Zoom arrière",
+  "media.zoomFit": "Ajuster à la vue",
   "shortcuts.title": "Raccourcis clavier",
   "shortcuts.sectionList": "Liste",
-  "shortcuts.sectionDetail": "Détail et lecteur",
+  "shortcuts.sectionDetail": "Détail",
   "shortcuts.commandMenu":
     "Ouvrir le menu de commandes (actions sur le fichier, recherches récentes, collections intelligentes)",
-  "shortcuts.search": "Cibler la recherche",
+  "shortcuts.search": "Rechercher",
   "shortcuts.scrollDown": "Défiler vers le bas",
   "shortcuts.scrollUp": "Défiler vers le haut",
   "shortcuts.moveFocus": "Déplacer le focus (haut/bas/gauche/droite)",
@@ -310,10 +468,47 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.skip10": "Reculer / avancer 10 s",
   "shortcuts.volume": "Monter / baisser le volume",
   "shortcuts.mute": "Activer/couper le son",
+  "shortcuts.speed": "Plus lent / plus rapide",
   "shortcuts.fullscreen": "Basculer en plein écran",
   "shortcuts.seekStart": "Aller au début",
   "shortcuts.spectrumPattern":
     "Motif du spectre suivant / précédent (audio dans le lecteur de liste)",
+  "shortcuts.sectionGeneral": "Général",
+  "shortcuts.sectionPlayback": "Lecture",
+  "shortcuts.sectionPlayer": "Lecteur",
+  "shortcuts.sectionDiscover": "Découvrir",
+  "shortcuts.hintGeneral": "Partout",
+  "shortcuts.hintList": "Bibliothèque",
+  "shortcuts.hintDetail": "Un fichier ouvert",
+  "shortcuts.hintPlayback": "Vidéo et audio",
+  "shortcuts.hintPlayer": "Liste de lecture",
+  "shortcuts.hintDiscover": "Cartes au hasard",
+  "shortcuts.zoom": "Zoom avant / arrière",
+  "shortcuts.zoomReset": "Réinitialiser le zoom",
+  "shortcuts.imagePaging": "Fichier précédent / suivant (images)",
+  "shortcuts.imageZoom": "Zoomer l'image ou la vidéo (vers le pointeur)",
+  "shortcuts.imageZoomToggle": "Ajuster l'image / taille réelle",
+  "shortcuts.wheel": "Molette",
+  "shortcuts.doubleClick": "Double-clic",
+  "shortcuts.playerPrevNext": "Précédent / suivant",
+  "shortcuts.playerArrows": "Précédent / suivant (images et audio)",
+  "shortcuts.shuffle": "Activer ou désactiver l’ordre aléatoire",
+  "shortcuts.playerDetail": "Ouvrir les détails du fichier en cours",
+  "shortcuts.playerExit": "Quitter le lecteur",
+  "shortcuts.discoverPaging": "Carte précédente / suivante",
+  "shortcuts.discoverReshuffle": "Mélanger à nouveau",
+  "shortcuts.preset": "Préréglage",
+  "shortcuts.presetNote": "Les touches marquées d’un point le suivent.",
+  "shortcuts.presetChange": "Modifier dans les Réglages",
+  "shortcuts.filterLabel": "Filtrer les raccourcis",
+  "shortcuts.filterPlaceholder": "Filtrer par action ou touche",
+  "shortcuts.noMatch": "Aucun raccourci ne correspond à « {query} »",
+  "shortcuts.noMatchHint":
+    "Essayez une action (« volume ») ou une touche (« ctrl »).",
+  "shortcuts.sectionsLabel": "Sections",
+  "shortcuts.or": "ou",
+  "shortcuts.toClose": "pour fermer",
+  "shortcuts.macNote": "Sur macOS, Ctrl correspond à ⌘.",
   "media.rating": "Note",
   "media.tags": "Tags",
   "media.note": "Mémo",
@@ -356,6 +551,12 @@ export const fr: Record<TranslationKey, string> = {
   "media.metaDuration": "Durée",
   "media.metaCodec": "Codec",
   "media.metaFps": "IPS",
+  "media.metaSampleRate": "Fréquence d'échantillonnage",
+  "media.metaBitDepth": "Profondeur de bits",
+  "media.metaChannels": "Canaux",
+  "media.metaBpm": "BPM",
+  "media.metaKey": "Tonalité",
+  "media.metaGenre": "Genre",
   "media.playHistory": "Historique de lecture",
   "media.scenes": "Scènes",
   "media.bookmarks": "Marque-pages",
@@ -366,6 +567,40 @@ export const fr: Record<TranslationKey, string> = {
   "media.currentMainThumb": "Miniature principale actuelle :",
 
   // player controls
+  "grade.cool": "Froid",
+  "grade.warm": "Chaud",
+  "grade.green": "Vert",
+  "grade.magenta": "Magenta",
+  "grade.title": "Réglages vidéo",
+  "grade.color": "Couleur",
+  "grade.exposure": "Exposition",
+  "grade.contrast": "Contraste",
+  "grade.pivot": "Pivot",
+  "grade.saturation": "Saturation soustractive",
+  "grade.temperature": "Température",
+  "grade.tint": "Teinte",
+  "grade.toggle": "Activer les réglages vidéo",
+  "grade.on": "Activé",
+  "grade.off": "Désactivé",
+  "grade.resetAll": "Tout réinitialiser",
+  "grade.holdHint":
+    "Maintenez le nom d’un réglage pour afficher sa valeur neutre.",
+  "grade.preview": "Aperçu sRGB linéaire",
+  "grade.unavailable":
+    "Les réglages vidéo sont indisponibles sur cet appareil.",
+
+  "player.subtitles": "Sous-titres",
+  "player.subtitleAuto": "Suivre la langue audio",
+  "player.subtitleOff": "Désactivés",
+  "player.subtitleResetPosition": "Réinitialiser la position",
+  "player.subtitleLoading": "Chargement des sous-titres…",
+  "player.subtitleUnavailable":
+    "Impossible de charger cette piste de sous-titres.",
+  "player.subtitleTrackNumber": "Piste {number}",
+  "player.audioSubtitles": "Audio et sous-titres",
+  "player.subtitleAutoMatch": "Avec l’audio en {audio}, choisit {track}",
+  "player.subtitleAutoNone": "Aucun sous-titre correspondant (désactivés)",
+  "player.subtitleAutoUnknown": "Langue audio inconnue (désactivés)",
   "player.play": "Lecture",
   "player.playKey": "Lecture (Space)",
   "player.pauseKey": "Pause (Space)",
@@ -375,6 +610,13 @@ export const fr: Record<TranslationKey, string> = {
   "player.unmute": "Réactiver le son (M)",
   "player.fullscreen": "Plein écran (F)",
   "player.volume": "Volume",
+  "player.speed": "Vitesse de lecture",
+  "player.speedValue": "{speed}×",
+  "player.audioTrack": "Piste audio",
+  "player.audioTrackNumber": "Piste {number}",
+  "player.audioTrackDefault": "Par défaut",
+  "player.audioTrackUnavailable":
+    "Impossible de lire cette piste. La piste précédente a été rétablie.",
   "player.seek": "Position",
   "player.playFailed": "Impossible de lire dans le lecteur intégré.",
   "player.openExternal": "Ouvrir dans un lecteur externe",
@@ -388,6 +630,8 @@ export const fr: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "Le chargement a été interrompu (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "Erreur réseau (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "L'image n'a pas pu être décodée — son codec n'est peut-être pas pris en charge ici",
   "player.errDecode":
     "Échec du décodage — le codec n'est peut-être pas pris en charge (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":
@@ -437,6 +681,8 @@ export const fr: Record<TranslationKey, string> = {
   "select.deselectAll": "Vider",
   "select.editTags": "Modifier les tags",
   "select.exit": "Quitter la sélection",
+  "select.compare": "Comparer",
+  "select.compareHint": "Sélectionnez exactement deux images pour les comparer",
   "select.bulkFileLimit":
     "Jusqu’à {max} fichiers par modification. Réduisez la sélection.",
   "select.ratingClear": "Effacer la note",
@@ -446,15 +692,36 @@ export const fr: Record<TranslationKey, string> = {
   "select.watchLaterOff": "Retirer de À voir plus tard",
   "select.rating": "Attribuer une note",
   "select.ratingMixed": "La sélection a des notes différentes",
-  "select.favoriteAdded": "{count} fichiers ajoutés aux favoris",
-  "select.favoriteRemoved": "{count} fichiers retirés des favoris",
-  "select.watchLaterAdded": "{count} fichiers ajoutés à À voir plus tard",
-  "select.watchLaterRemoved": "{count} fichiers retirés de À voir plus tard",
-  "select.ratingApplied": "{count} fichiers notés {rating}",
-  "select.ratingCleared": "Note effacée sur {count} fichiers",
+  "select.favoriteAdded": {
+    one: "{count} fichier ajouté aux favoris",
+    other: "{count} fichiers ajoutés aux favoris",
+  },
+  "select.favoriteRemoved": {
+    one: "{count} fichier retiré des favoris",
+    other: "{count} fichiers retirés des favoris",
+  },
+  "select.watchLaterAdded": {
+    one: "{count} fichier ajouté à À voir plus tard",
+    other: "{count} fichiers ajoutés à À voir plus tard",
+  },
+  "select.watchLaterRemoved": {
+    one: "{count} fichier retiré de À voir plus tard",
+    other: "{count} fichiers retirés de À voir plus tard",
+  },
+  "select.ratingApplied": {
+    one: "{count} fichier noté {rating}",
+    other: "{count} fichiers notés {rating}",
+  },
+  "select.ratingCleared": {
+    one: "Note effacée sur {count} fichier",
+    other: "Note effacée sur {count} fichiers",
+  },
   "select.bulkFailed": "La modification groupée n’a pas été appliquée : {msg}",
   "select.bulkTagTitle": "Modifier les tags en lot",
-  "select.bulkTagSubtitle": "S’applique aux {count} fichiers sélectionnés",
+  "select.bulkTagSubtitle": {
+    one: "S’applique à {count} fichier sélectionné",
+    other: "S’applique aux {count} fichiers sélectionnés",
+  },
   "select.bulkTagAddLabel": "Ajouter un tag",
   "select.bulkTagPending": "En attente",
   "select.bulkTagExisting": "Tags présents dans la sélection",
@@ -470,13 +737,16 @@ export const fr: Record<TranslationKey, string> = {
   "select.bulkTagNameLimit": "Jusqu’à {max} tags par modification.",
   "select.tagsApplied":
     "{files} fichiers mis à jour ({added} ajoutés, {removed} retirés)",
-  "select.tagsSkipped": "{count} fichiers ignorés : absents de l’index.",
+  "select.tagsSkipped": {
+    one: "{count} fichier ignoré : absent de l’index.",
+    other: "{count} fichiers ignorés : absents de l’index.",
+  },
   "select.tagsFailed": "Impossible d’appliquer les tags : {msg}",
 
   // media grid
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
-    "Lancez « Analyser » pour lister ici les vidéos et les images.",
+    "Lancez « Analyser » pour lister ici les vidéos, les images et les fichiers audio.",
   "grid.searchByTag": "Filtrer par « {name} »",
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
@@ -489,10 +759,22 @@ export const fr: Record<TranslationKey, string> = {
   "heatmap.metric.captured": "Capturés",
   "heatmap.metric.created": "Créés",
   "heatmap.metric.added": "Ajoutés",
-  "heatmap.cell.played": "{date} : {count} lus",
-  "heatmap.cell.captured": "{date} : {count} capturés",
-  "heatmap.cell.created": "{date} : {count} créés",
-  "heatmap.cell.added": "{date} : {count} ajoutés",
+  "heatmap.cell.played": {
+    one: "{date} : {count} lu",
+    other: "{date} : {count} lus",
+  },
+  "heatmap.cell.captured": {
+    one: "{date} : {count} capturé",
+    other: "{date} : {count} capturés",
+  },
+  "heatmap.cell.created": {
+    one: "{date} : {count} créé",
+    other: "{date} : {count} créés",
+  },
+  "heatmap.cell.added": {
+    one: "{date} : {count} ajouté",
+    other: "{date} : {count} ajoutés",
+  },
   "heatmap.range.last": "12 derniers mois",
   "heatmap.range.prev": "Année précédente",
   "heatmap.range.next": "Année suivante",
@@ -503,6 +785,13 @@ export const fr: Record<TranslationKey, string> = {
   "heatmap.clearDay": "Effacer les jours sélectionnés",
   "heatmap.error": "Impossible de charger les décomptes",
 
+  // Filmstrip view
+  "view.filmstrip": "Vue pellicule",
+  "view.folderUnavailableFilmstrip":
+    "L’affichage par dossier n’est pas disponible dans la vue pellicule",
+  "filmstrip.bookmarks": "Signets : {count}",
+  "filmstrip.playFrom": "Lire à partir de {time}",
+  "filmstrip.waveform": "Forme d'onde : cliquez pour lire à partir de ce point",
   // Vue chronologique
   "view.timeline": "Vue chronologique",
   "view.folderUnavailableTimeline":
@@ -512,10 +801,19 @@ export const fr: Record<TranslationKey, string> = {
   "timeline.axis.btime": "Création",
   "timeline.axis.added": "Ajout",
   "timeline.undated": "Sans date",
-  "timeline.count": "{count} fichiers",
+  "timeline.count": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "timeline.scrubber": "Aller à un mois",
-  "timeline.month": "{month} : {count} fichiers",
-  "timeline.day": "{day} : {count} fichiers",
+  "timeline.month": {
+    one: "{month} : {count} fichier",
+    other: "{month} : {count} fichiers",
+  },
+  "timeline.day": {
+    one: "{day} : {count} fichier",
+    other: "{day} : {count} fichiers",
+  },
   "timeline.sortLocked":
     "La vue chronologique classe les fichiers par date, du plus récent au plus ancien",
   "timeline.error": "Impossible de charger la chronologie",
@@ -580,7 +878,10 @@ export const fr: Record<TranslationKey, string> = {
   "folder.back": "Retour",
   "folder.up": "Remonter d'un niveau",
   "folder.more": "Afficher les niveaux masqués",
-  "folder.itemCount": "{count} éléments",
+  "folder.itemCount": {
+    one: "{count} élément",
+    other: "{count} éléments",
+  },
   "folder.subfolders": "Sous-dossiers : {count}",
   "folder.summary": "Dossiers : {folders} · Fichiers : {files}",
   "folder.openInFileManager": "Ouvrir dans le gestionnaire de fichiers",
@@ -596,6 +897,23 @@ export const fr: Record<TranslationKey, string> = {
     "Le dossier affiché n'existe plus ; vous avez été ramené au niveau supérieur.",
   "folder.chip": "Dossier",
   "folder.showInLibrary": "Afficher le dossier dans la bibliothèque",
+  "folder.excludeFromScans": "Exclure des analyses",
+  "folder.excludeConfirm":
+    "Ce dossier est exclu des analyses de cet espace de travail.",
+  "folder.excludeAction": "Exclure",
+  "folder.excluded": "« {name} » est exclu des analyses",
+  "folder.excludeTitle": "Exclure « {name} » des analyses",
+  "folder.excludeTarget": "Dossier",
+  "folder.excludeHides": {
+    one: "Le {count} fichier qu'il contient est masqué dès maintenant. Rien n'est supprimé du disque.",
+    other:
+      "Les {count} fichiers qu'il contient sont masqués dès maintenant. Rien n'est supprimé du disque.",
+  },
+  "folder.excludeOnlyThis":
+    "Seul ce dossier est exclu. Les dossiers nommés « {name} » ailleurs sont toujours analysés.",
+  "folder.excludeUndoHint":
+    "Pour le réinclure, modifiez l'espace de travail, section « Exclus des analyses ».",
+  "folder.excludeFailed": "Impossible d'exclure le dossier",
   "folder.showFailed": "Impossible d'afficher le dossier",
   "folder.subfolderMenu": "Sous-dossiers de « {name} »",
   "folder.loading": "Chargement…",
@@ -605,7 +923,10 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.folderBack":
     "Revenir au dossier précédent (affichage par dossier)",
   "shortcuts.folderUp": "Remonter d'un niveau (affichage par dossier)",
-  "select.folderCount": "dont {count} dossiers",
+  "select.folderCount": {
+    one: "dont {count} dossier",
+    other: "dont {count} dossiers",
+  },
   "select.folderLoading": "Chargement du contenu du dossier",
   "select.selectFolder": "Sélectionner tout le contenu du dossier",
   "select.deselectFolder": "Désélectionner ce dossier",
@@ -618,26 +939,62 @@ export const fr: Record<TranslationKey, string> = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "Choisis dans « {path} »",
   "discover.empty": "Aucun média à recommander.",
+  "discover.loadFailed":
+    "Impossible de charger les médias à recommander. Veuillez réessayer.",
   "discover.emptyHint":
-    "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
-  "discover.sceneHint":
-    "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+    "Lancez « Analyser » pour importer des vidéos, des images et des fichiers audio ; ils seront recommandés ici au hasard.",
+  "discover.sceneHint": "Cliquez sur une scène pour y accéder",
   "discover.moreScenes": "+{count}",
 
   // Historique de lecture
   "history.title": "Historique de lecture",
   "history.empty": "Aucun historique de lecture pour l'instant.",
+  "history.loadFailed":
+    "Impossible de charger l'historique de lecture. Veuillez réessayer.",
   "history.emptyHint":
-    "Lisez des vidéos ou des images et elles apparaîtront ici.",
+    "Lisez des vidéos, des images ou des fichiers audio et ils apparaîtront ici.",
   "history.clear": "Effacer l'historique",
   "history.clearAction": "Effacer",
   "history.clearConfirm":
     "Supprimer l'historique de lecture et les points de reprise de tous les espaces de travail ? Cette action est irréversible.",
-  "history.playCount": "{count} lectures",
+  "history.playCount": {
+    one: "{count} lecture",
+    other: "{count} lectures",
+  },
   "history.viaBrowser": "Dans l'application",
   "history.viaExternal": "Lecteur externe",
   "history.today": "Aujourd'hui",
   "history.yesterday": "Hier",
+
+  // Missing files
+  "missing.title": "Fichiers introuvables",
+  "missing.empty": "Aucun fichier introuvable.",
+  "missing.loadFailed":
+    "Impossible de rechercher les fichiers introuvables. Veuillez réessayer.",
+  "missing.hint":
+    "Fichiers qu’un scan n’a pas trouvés sur le disque. Si un fichier revient, il retrouve ses collections comme avant. Sélectionnez uniquement ceux qui ne reviendront pas, puis supprimez-les.",
+  "missing.scanning":
+    "Les espaces de travail en cours de scan n’apparaissent qu’une fois leur scan terminé.",
+  "missing.truncated":
+    "Affichage des {shown} fichiers introuvables les plus récents sur {total}. Supprimez-les pour voir les suivants.",
+  "missing.selectAll": "Tout sélectionner",
+  "missing.goneAt": "Introuvable depuis le {date}",
+  "missing.remove": "Supprimer les fichiers introuvables",
+  "missing.removeSelected": {
+    one: "Supprimer {count} sélectionné",
+    other: "Supprimer {count} sélectionnés",
+  },
+  "missing.removeConfirm": {
+    one: "Retirer {count} fichier sélectionné de la liste et des collections, et supprimer sa miniature ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+    other:
+      "Retirer les {count} fichiers sélectionnés de la liste et des collections, et supprimer leurs miniatures ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+  },
+  "missing.removeAction": "Supprimer",
+  "missing.removedToast": {
+    one: "{count} fichier supprimé",
+    other: "{count} fichiers supprimés",
+  },
+  "missing.removeFailed": "Impossible de supprimer les fichiers",
 
   "duplicates.title": "Fichiers en double",
   "duplicates.empty": "Aucun fichier en double trouvé.",
@@ -646,12 +1003,22 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.loadFailed":
     "Impossible de charger les fichiers en double. Veuillez réessayer.",
   "duplicates.retry": "Réessayer",
-  "duplicates.fileCount": "{count} fichiers",
+  "duplicates.copyHash": "Copier l’empreinte",
+  "duplicates.hashCopied": "Empreinte copiée",
+  "duplicates.hashCopyFailed": "Impossible de copier l’empreinte",
+  "duplicates.showInList": "Afficher dans la liste",
+  "duplicates.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",
   "duplicates.filter": "Afficher uniquement les fichiers en double",
   "duplicates.chip": "Doublons",
-  "duplicates.groupCount": "{count} groupes",
+  "duplicates.groupCount": {
+    one: "{count} groupe",
+    other: "{count} groupes",
+  },
   "duplicates.reclaimable": "Récupérable",
   "duplicates.search": "Filtrer par nom ou chemin",
   "duplicates.sortLabel": "Trier par",
@@ -687,7 +1054,10 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.page.prev": "Précédent",
   "autoTag.page.next": "Suivant",
   "autoTag.page.range": "{from}–{to} sur {total}",
-  "autoTag.fileCount": "{count} fichiers",
+  "autoTag.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "autoTag.tab.regex": "Regex",
   "autoTag.tab.keywords": "Mots-clés",
   "autoTag.tab.folders": "Dossiers",
@@ -697,8 +1067,11 @@ export const fr: Record<TranslationKey, string> = {
     "Exécute les règles actives et les mots-clés sur les fichiers ajoutés ou modifiés par une analyse.",
   "autoTag.reapply": "Appliquer aux fichiers existants",
   "autoTag.reapplying": "Application…",
-  "autoTag.reapplyConfirm":
-    "Exécuter les règles, les mots-clés et les règles de dossier sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+  "autoTag.reapplyConfirm": {
+    one: "Exécuter les règles, les mots-clés et les règles de dossier sur {count} fichier et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+    other:
+      "Exécuter les règles, les mots-clés et les règles de dossier sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+  },
   "autoTag.reapplyDone": "{added} étiquettes ajoutées à {files} fichiers",
   "autoTag.patternRules": "Règles de motif",
   "autoTag.evaluatedInOrder": "évaluées de haut en bas",
@@ -722,7 +1095,10 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.excludeNone": "Rien n'est encore exclu.",
   "autoTag.excludeNoMatch": "Aucune valeur ne le contient.",
   "autoTag.excludeFull": "La liste est pleine.",
-  "autoTag.excludeCount": "{count} valeurs",
+  "autoTag.excludeCount": {
+    one: "{count} valeur",
+    other: "{count} valeurs",
+  },
   "autoTag.excluded": "Exclu",
   "autoTag.letterCase": "Casse",
   "autoTag.case.keep": "Conserver",
@@ -798,14 +1174,22 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.keyword.noTagsShort": "aucun tag",
   "autoTag.renameTag": "Renommer le tag « {tag} »",
   "autoTag.migrate.title": "Passer les fichiers à « {to} » ?",
-  "autoTag.migrate.message":
-    "{count} fichiers atteints par cette condition portent « {from} ». Le remplacer par « {to} » sur ceux-ci ? Leurs copies changent avec eux. Sinon, seul le réglage change et les fichiers gardent « {from} ».",
+  "autoTag.migrate.message": {
+    one: "{count} fichier atteint par cette condition porte « {from} ». Le remplacer par « {to} » sur celui-ci ? Ses copies changent avec lui. Sinon, seul le réglage change et le fichier garde « {from} ».",
+    other:
+      "{count} fichiers atteints par cette condition portent « {from} ». Le remplacer par « {to} » sur ceux-ci ? Leurs copies changent avec eux. Sinon, seul le réglage change et les fichiers gardent « {from} ».",
+  },
   "autoTag.migrate.sampled":
     " Seuls les {count} premiers fichiers, ceux chargés ici, sont examinés.",
-  "autoTag.migrate.confirm": "Remplacer sur {count} fichiers",
+  "autoTag.migrate.confirm": {
+    one: "Remplacer sur {count} fichier",
+    other: "Remplacer sur {count} fichiers",
+  },
   "autoTag.migrate.cancel": "Réglage seulement",
-  "autoTag.migrate.done":
-    "« {from} » remplacé par « {to} » sur {count} fichiers.",
+  "autoTag.migrate.done": {
+    one: "« {from} » remplacé par « {to} » sur {count} fichier.",
+    other: "« {from} » remplacé par « {to} » sur {count} fichiers.",
+  },
   "autoTag.matchMode": "Correspondance",
   "autoTag.mode.word": "Mot entier",
   "autoTag.mode.contains": "Contient",
@@ -844,15 +1228,26 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.appliedMany": "{tags} étiquettes appliquées à {files} fichiers.",
   "autoTag.appliedDictSuffix":
     " Les prochaines analyses les appliqueront aussi.",
-  "autoTag.addedKeywords": "{count} ajoutés aux mots-clés.",
-  "autoTag.keywordsFullSuffix":
-    " {count} n'ont pas pu être ajoutés : les mots-clés sont pleins.",
-  "autoTag.removeFromFiles": "Retirer de {count} fichiers",
+  "autoTag.addedKeywords": {
+    one: "{count} ajouté aux mots-clés.",
+    other: "{count} ajoutés aux mots-clés.",
+  },
+  "autoTag.keywordsFullSuffix": {
+    one: " {count} n'a pas pu être ajouté : les mots-clés sont pleins.",
+    other: " {count} n'ont pas pu être ajoutés : les mots-clés sont pleins.",
+  },
+  "autoTag.removeFromFiles": {
+    one: "Retirer de {count} fichier",
+    other: "Retirer de {count} fichiers",
+  },
   "autoTag.removeHint":
     "Retire ce tag des fichiers qui le portent, quelle que soit son origine",
   "autoTag.removeTitle": "Retirer « {tag} » ?",
-  "autoTag.removeMessage":
-    "« {tag} » sera retiré de {count} fichiers et de leurs copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+  "autoTag.removeMessage": {
+    one: "« {tag} » sera retiré de {count} fichier et de ses copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+    other:
+      "« {tag} » sera retiré de {count} fichiers et de leurs copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+  },
   "autoTag.removeConfirm": "Retirer",
   "autoTag.removedOne": "« {tag} » retiré de {files} fichiers.",
   "autoTag.removeSelected": "Retirer de {files} fichiers",
@@ -868,7 +1263,10 @@ export const fr: Record<TranslationKey, string> = {
     "Affiche les fichiers contenant les mots de ce candidat avec la recherche de la bibliothèque",
   "autoTag.noCandidates": "Aucun candidat pour ce filtre.",
   "autoTag.selection": "{count} sélectionnées · étiquette {files} fichiers",
-  "autoTag.selectionIgnored": "{count} sélectionnées",
+  "autoTag.selectionIgnored": {
+    one: "{count} sélectionnée",
+    other: "{count} sélectionnées",
+  },
   "autoTag.applySelected": "Appliquer la sélection",
   "autoTag.applySelectedDict": "Ajouter aux mots-clés et appliquer",
   "autoTag.clearSelection": "Effacer la sélection",
@@ -883,12 +1281,16 @@ export const fr: Record<TranslationKey, string> = {
   "tags.cloudOnlyAuto":
     "Seuls des tags automatiques sont disponibles. Activez les tags automatiques pour les voir.",
   "tags.empty": "Aucun tag pour l'instant.",
+  "tags.loadFailed": "Impossible de charger les tags. Veuillez réessayer.",
   "tags.emptyHint":
     "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",
   "tags.searchPlaceholder": "Filtrer les tags",
   "tags.noMatch": "Aucun tag correspondant.",
   "tags.truncated": "Trop de tags : affichage des {max} premiers.",
-  "tags.fileCount": "{count} fichiers",
+  "tags.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "tags.sortByName": "Par nom",
   "tags.sortByCount": "Par nombre",
   "tags.groupManual": "Tags manuels",
@@ -898,7 +1300,10 @@ export const fr: Record<TranslationKey, string> = {
   "tags.filterByTag": "Filtrer par ce tag",
   "tags.source.manual": "Manuel",
   "tags.source.autoMeta": "Automatique",
-  "tags.selected": "{count} sélectionnés",
+  "tags.selected": {
+    one: "{count} sélectionné",
+    other: "{count} sélectionnés",
+  },
   "tags.clearSelection": "Annuler la sélection",
   "tags.rename": "Renommer",
   "tags.renameTitle": "Renommer le tag",
@@ -913,12 +1318,18 @@ export const fr: Record<TranslationKey, string> = {
     "Les {count} tags sélectionnés sont regroupés dans la cible dans tous les espaces de travail. Les autres sont supprimés.",
   "tags.mergeTarget": "Fusionner dans",
   "tags.mergeAction": "Fusionner",
-  "tags.merged": "{count} tags fusionnés",
+  "tags.merged": {
+    one: "{count} tag fusionné",
+    other: "{count} tags fusionnés",
+  },
   "tags.mergeFailed": "Impossible de fusionner les tags",
   "tags.delete": "Supprimer",
   "tags.deleteAction": "Supprimer",
-  "tags.deleteConfirm":
-    "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
+  "tags.deleteConfirm": {
+    one: "Le tag « {name} » sera retiré de {count} fichier dans tous les espaces de travail. Continuer ?",
+    other:
+      "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
+  },
   "tags.deleteConfirmMany":
     "Les {count} tags sélectionnés seront supprimés de tous les espaces de travail. Continuer ?",
   "tags.deleted": "Tag supprimé",
@@ -930,12 +1341,28 @@ export const fr: Record<TranslationKey, string> = {
   "tags.ns.dur": "Durée",
   "tags.ns.codec": "Codec",
   "tags.ns.orient": "Orientation",
+  "tags.ns.quality": "Qualité",
+  "tags.ns.ch": "Canaux",
+  "tags.ns.tempo": "Tempo",
+  "tags.ns.bpm": "BPM",
+  "tags.ns.key": "Tonalité",
+  "tags.ns.camelot": "Camelot",
+  "tags.ns.genre": "Genre",
   "tags.value.durShort": "Courte",
   "tags.value.durMedium": "Moyenne",
   "tags.value.durLong": "Longue",
   "tags.value.orientVertical": "Portrait",
   "tags.value.orientHorizontal": "Paysage",
   "tags.value.orientSquare": "Carré",
+  "tags.value.qualityLossless": "Sans perte",
+  "tags.value.qualityLossy": "Avec perte",
+  "tags.value.qualityHires": "Haute résolution",
+  "tags.value.chMono": "Mono",
+  "tags.value.chStereo": "Stéréo",
+  "tags.value.chSurround": "Surround",
+  "tags.value.tempoSlow": "Lent",
+  "tags.value.tempoModerate": "Modéré",
+  "tags.value.tempoFast": "Rapide",
 
   // workspace rail
   "workspace.all": "Tout",
@@ -943,6 +1370,32 @@ export const fr: Record<TranslationKey, string> = {
   "workspace.edit": "Modifier l'espace de travail",
   "workspace.editAction": "Enregistrer",
   "workspace.pathReadonly": "Le chemin ne peut pas être modifié.",
+  "workspace.excludedFolders": "Exclus des analyses",
+  "workspace.excludedFoldersEmpty":
+    "Aucun dossier. Faites un clic droit sur un dossier dans la vue par dossiers, ou utilisez « Ajouter un dossier ».",
+  "workspace.excludedFolderNotFound": "Introuvable",
+  "workspace.excludedFolderInclude": "Réinclure {path} dans les analyses",
+  "workspace.excludedFoldersNextScan":
+    "Les dossiers retirés de la liste sont de nouveau analysés à partir de la prochaine analyse.",
+  "workspace.excludedFoldersDesc":
+    "Seulement ces dossiers et leur contenu. Les dossiers du même nom situés ailleurs sont toujours analysés.",
+  "workspace.excludedFolderIncludeAction": "Inclure",
+  "workspace.excludedFolderRemoveAction": "Retirer",
+  "workspace.excludedFolderRemove": "Retirer {path} de la liste",
+  "workspace.excludedFolderUndo": "Annuler",
+  "workspace.excludedFolderUndoLabel": "Annuler la modification de {path}",
+  "workspace.excludedFolderIncluding": "Inclus à l'enregistrement",
+  "workspace.excludedFolderAdding": "Exclu à l'enregistrement",
+  "workspace.excludedFoldersAdd": "Ajouter un dossier",
+  "workspace.excludedFolderOutside":
+    "Choisissez un dossier dans l'espace de travail",
+  "workspace.excludedFolderPickFailed":
+    "Impossible d'ouvrir le sélecteur de dossiers",
+  "workspace.excludedFoldersRetry": "Réessayer",
+  "workspace.excludedFoldersLoadError":
+    "Impossible de lire les dossiers exclus.",
+  "workspace.excludedFoldersSaveError":
+    "Impossible de mettre à jour les dossiers exclus",
   "workspace.addDirectory": "Ajouter un dossier vidéo",
   "workspace.removeFromSidebar": "Supprimer l'espace de travail",
   "workspace.removeTitle": "Supprimer l'espace de travail",
@@ -956,19 +1409,25 @@ export const fr: Record<TranslationKey, string> = {
   "drop.overlayTitle":
     "Déposez des dossiers pour les ajouter comme espaces de travail",
   "drop.foldersOnly":
-    "Meguri indexe des dossiers, pas des fichiers isolés. Déposez un dossier.",
+    "{app} indexe des dossiers, pas des fichiers isolés. Déposez un dossier.",
   "drop.addTitle": "Ajouter un espace de travail",
   "drop.addConfirm":
     "Ajouter « {name} » comme espace de travail et l’analyser ?",
   "drop.addAction": "Ajouter",
   "drop.notDirectory": "« {name} » n’est pas un dossier et n’a pas été ajouté",
   "drop.addFailed": "Impossible d’ajouter « {name} »",
-  "drop.addedToCollection": "{count} fichiers ajoutés à « {name} »",
+  "drop.addedToCollection": {
+    one: "{count} fichier ajouté à « {name} »",
+    other: "{count} fichiers ajoutés à « {name} »",
+  },
   "drop.addedOneToCollection": "1 fichier ajouté à « {name} »",
   "drop.alreadyInCollection": "Déjà dans « {name} »",
   "drop.alreadyOneInCollection": "Déjà dans « {name} »",
   "drop.addToCollectionFailed": "Impossible d’ajouter à la collection",
-  "drag.fileCount": "{count} fichiers",
+  "drag.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "drag.external": "Glisser vers une autre application",
   "drag.externalFailed":
     "Impossible de démarrer le glissement. Vérifiez que les fichiers sont toujours disponibles.",
@@ -994,8 +1453,14 @@ export const fr: Record<TranslationKey, string> = {
   "collection.removeFrom": "Retirer de « {name} »",
   "collection.addedToast": "Ajouté à « {name} »",
   "collection.removedFromToast": "Retiré de « {name} »",
-  "collection.addedCountToast": "{count} fichiers ajoutés à « {name} »",
-  "collection.removedCountToast": "{count} fichiers retirés de « {name} »",
+  "collection.addedCountToast": {
+    one: "{count} fichier ajouté à « {name} »",
+    other: "{count} fichiers ajoutés à « {name} »",
+  },
+  "collection.removedCountToast": {
+    one: "{count} fichier retiré de « {name} »",
+    other: "{count} fichiers retirés de « {name} »",
+  },
   "collection.actionFailed": "Impossible de mettre à jour la collection",
 
   // À regarder plus tard (collection intégrée)
@@ -1029,9 +1494,18 @@ export const fr: Record<TranslationKey, string> = {
   "statusbar.label": "Barre d'état",
   "statusbar.lastScan": "Dernier scan",
   "statusbar.lastScanNever": "Jamais",
-  "statusbar.total": "{count} fichiers au total",
-  "statusbar.folders": "{count} dossiers",
-  "statusbar.shown": "{count} affichés",
+  "statusbar.total": {
+    one: "{count} fichier au total",
+    other: "{count} fichiers au total",
+  },
+  "statusbar.folders": {
+    one: "{count} dossier",
+    other: "{count} dossiers",
+  },
+  "statusbar.shown": {
+    one: "{count} affiché",
+    other: "{count} affichés",
+  },
   "statusbar.status": "État",
   "statusbar.scanning": "Analyse en cours",
   "statusbar.idle": "Inactif",
@@ -1054,7 +1528,7 @@ export const fr: Record<TranslationKey, string> = {
   "playlist.loading": "Chargement…",
   "playlist.empty": "Rien ici ne peut être lu.",
   "playlist.emptyHint":
-    "Ouvrez une liste contenant des vidéos ou des images, puis démarrez la lecture.",
+    "Ouvrez une liste contenant des vidéos, des images ou des fichiers audio, puis démarrez la lecture.",
   "playlist.unplayable": "Aucun de ces éléments n’a pu être lu.",
   "playlist.reorderNeedsManual":
     "Passez à l’ordre manuel pour réorganiser les éléments.",
@@ -1127,18 +1601,18 @@ export const fr: Record<TranslationKey, string> = {
   "tour.languageTitle": "Choisis ta langue",
   "tour.languageBody":
     "Choisis la langue à utiliser. La suite de la visite l'utilisera, et tu pourras la changer plus tard dans les paramètres.",
-  "tour.welcomeTitle": "Bienvenue dans Meguri",
+  "tour.welcomeTitle": "Bienvenue dans {app}",
   "tour.welcomeBody":
     "Je te fais faire le tour. Appuie sur Échap pour passer à tout moment.",
   "tour.addWorkspaceTitle": "Ajouter un dossier",
   "tour.addWorkspaceBody":
-    "Commence par ajouter un dossier contenant tes vidéos et images. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
+    "Commence par ajouter un dossier contenant tes vidéos, images ou fichiers audio. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
   "tour.collectionsTitle": "Collections",
   "tour.collectionsBody":
     "Regroupe des fichiers de n'importe quel dossier dans une collection. Glisse des fichiers ici pour les ajouter.",
   "tour.searchTitle": "Rechercher et filtrer",
   "tour.searchBody":
-    "Recherche par nom de fichier ou par tag. Appuie sur / dans la liste pour venir ici.",
+    "Recherche par nom de fichier ou par tag. Clique ici ou appuie sur / dans la liste, puis tape dans le menu qui s'ouvre.",
   "tour.viewTitle": "Changer de vue",
   "tour.viewBody":
     "Affiche tes fichiers en grille, en liste, en chronologie ou en graphe.",
@@ -1164,4 +1638,35 @@ export const fr: Record<TranslationKey, string> = {
   "settings.tour": "Tutoriel",
   "settings.tourDesc": "Affiche à nouveau la visite du premier lancement",
   "settings.tourReplay": "Revoir",
+
+  // image comparison
+  "compare.title": "Comparer des images",
+  "compare.mode": "Comparaison",
+  "compare.mode.slider": "Curseur",
+  "compare.mode.difference": "Différence",
+  "compare.mode.onion": "Superposition",
+  "compare.mode.blink": "Clignotement",
+  "compare.opacity": "Opacité de B",
+  "compare.swap": "Inverser A et B",
+  "compare.align": "Aligner",
+  "compare.alignHint":
+    "Déplace B du décalage trouvé pour que les deux se superposent",
+  "compare.zoomIn": "Zoom avant",
+  "compare.zoomOut": "Zoom arrière",
+  "compare.fit": "Ajuster",
+  "compare.split": "Position de la séparation",
+  "compare.aligning": "Alignement… {percent} %",
+  "compare.alignFailed": "Impossible d’aligner les images",
+  "compare.alignResult":
+    "Décalage {dx}, {dy} px · correspondance des contours {score} %",
+  "compare.alignScale": "échelle ×{scale}",
+  "compare.lowScore":
+    "correspondance des contours faible, l’alignement peut être faux",
+  "shortcuts.sectionCompare": "Comparaison d’images",
+  "shortcuts.compareModes":
+    "Curseur / différence / superposition / clignotement",
+  "shortcuts.compareSwap": "Inverser A et B",
+  "shortcuts.compareZoom": "Zoom avant / arrière sur les images",
+  "shortcuts.compareFit": "Ajuster les images",
+  "shortcuts.compareBlink": "Basculer entre A et B pendant le clignotement",
 };

@@ -1,12 +1,21 @@
 // Discovery queue. /discover. Picks random media matching the current filters and presents them one at a time,
 // Steam-discovery-queue style: a large preview, meta, tags, inline rating, and actions.
-// Overlays the list as a modal (like MediaDetail). No video autoplay; videos get
-// a hover scrub preview (frame endpoint) gated by the hoverPreview preference.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// Overlays the list as a modal (like MediaDetail). Videos do not start on their
+// own: they play in place once asked to (Play, or a scene picked from the rail),
+// and get a hover scrub preview (frame endpoint) gated by the hoverPreview
+// preference whenever they are not playing.
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
-import { api, events } from "@/ipc/client";
+import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
@@ -24,6 +33,7 @@ import {
 } from "@/components/ui/carousel";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FolderScopeChip } from "@/components/FolderScopeChip";
+import { LoadError } from "@/components/LoadError";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { usePreferences } from "@/settings/PreferencesProvider";
@@ -39,6 +49,7 @@ import {
   QUEUE_SIZE,
   parseDiscoverFilter,
 } from "./utils";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
 
 // The arrows overlay the card, so keep their disabled-hover background identical
 // to the resting one (the primitive clears it, assuming arrows sit outside).
@@ -52,6 +63,7 @@ let savedPosition: { wsId: string; filterKey: string; index: number } | null =
 
 export default function Discover() {
   const { t, lang } = useI18n();
+  const titleId = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
@@ -90,6 +102,7 @@ export default function Discover() {
   // Points at the selected slide's toggle so the "w" shortcut can activate it
   // through the button itself (same mutation, toast, effect and disabled state).
   const activeWatchLaterRef = useRef<HTMLButtonElement>(null);
+  const viewRef = useRef<HTMLDivElement>(null);
 
   // Keep the queue stable across remounts; reshuffle is explicit (the button below).
   const queue = useQuery({
@@ -100,23 +113,6 @@ export default function Discover() {
     refetchOnWindowFocus: false,
   });
   const items = queue.data ?? [];
-
-  // Cache-bust thumbnail URLs after a regeneration (e.g. the user picked a new main
-  // thumbnail from MediaDetail). Without this, the browser keeps showing the previous
-  // <thumbsDir>/<id>.webp since the path itself didn't change.
-  const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        const key = event.workspaceId
-          ? `${event.workspaceId}:${event.id}`
-          : String(event.id);
-        setThumbVersion((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
-      })
-      .then((u) => (unlisten = u));
-    return () => unlisten?.();
-  }, []);
 
   const [embla, setEmbla] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
@@ -171,14 +167,8 @@ export default function Discover() {
   useEffect(() => {
     if (!embla) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      // The shortcuts overlay or a confirm dialog over Discover owns the keys.
+      if (isTyping() || isLayerOnTop(viewRef.current)) return;
       if (e.code === "KeyR" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         void reshuffle();
@@ -228,7 +218,8 @@ export default function Discover() {
   // cache sync patches every ["files_random"]-prefixed query including this
   // queue (no reshuffle) plus the list / detail caches.
 
-  // Modal size toggle; the persisted value is shared with MediaDetail's modal.
+  // Modal size toggle; the persisted value is shared with MediaDetail's modal
+  // and the playlist player.
   const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
     MODAL_SIZE_KEY,
     "large",
@@ -250,11 +241,18 @@ export default function Discover() {
   const folderLabel = useFolderScopeLabel(discoverFilter.folder?.path);
 
   return (
-    <DiscoverModal onClose={() => void onClose()} size={modalSize}>
+    <DiscoverModal
+      onClose={() => void onClose()}
+      size={modalSize}
+      titleId={titleId}
+    >
       {/* Header overlaid on the media; empty header space clicks through to the card. */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center gap-2.5 px-4 py-3">
         <Sparkles className="size-4 text-primary drop-shadow-md" />
-        <span className="text-sm font-semibold text-bright-fg drop-shadow-md">
+        <span
+          id={titleId}
+          className="text-sm font-semibold text-bright-fg drop-shadow-md"
+        >
           {t("discover.title")}
         </span>
         {items.length > 0 && (
@@ -308,9 +306,16 @@ export default function Discover() {
         </div>
       </header>
 
-      <div className="h-full w-full">
+      <div ref={viewRef} className="h-full w-full">
         {loading ? (
           <Skeleton className="h-full w-full rounded-none" />
+        ) : queue.isError && !queue.data ? (
+          <LoadError
+            className="h-full"
+            message={t("discover.loadFailed")}
+            onRetry={() => void queue.refetch()}
+            retrying={queue.isFetching}
+          />
         ) : items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
             <Sparkles className="size-10 opacity-50" />
@@ -335,7 +340,6 @@ export default function Discover() {
                   <DiscoverCard
                     file={f}
                     mediaBase={mediaBase}
-                    thumbVersion={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
                     onRate={(rating) =>
                       setRating.mutate({
                         id: f.id,

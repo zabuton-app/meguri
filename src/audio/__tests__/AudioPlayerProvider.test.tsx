@@ -137,6 +137,11 @@ function Probe() {
       <button onClick={() => ctl.seek(9999)}>seek-past-end</button>
       <button onClick={() => ctl.setVolume(0.25)}>vol-25</button>
       <button onClick={ctl.toggleMuted}>toggle-muted</button>
+      <span data-testid="rate">{String(ctl.playbackRate)}</span>
+      <button onClick={() => ctl.setPlaybackRate(1.5)}>rate-150</button>
+      <button onClick={() => ctl.setPlaybackRate((r) => r + 0.25)}>
+        rate-up
+      </button>
       <button onClick={ctl.close}>close</button>
       <button onClick={ctl.dismissError}>dismiss</button>
     </div>
@@ -239,6 +244,24 @@ describe("AudioPlayerProvider", () => {
 
     click("seek-past-end");
     expect(el.currentTime).toBe(100);
+  });
+
+  it("plays the loaded track at the speed set, and the next one at normal speed", () => {
+    setup();
+    click("play");
+    click("rate-150");
+    click("rate-up");
+    expect(el.playbackRate).toBe(1.75);
+    expect(text("rate")).toBe("1.75");
+    // A reload of the source starts the element at normal speed again.
+    el.playbackRate = 1;
+    setDuration(100);
+    expect(el.playbackRate).toBe(1.75);
+
+    click("play-other");
+    expect(text("rate")).toBe("1");
+    setDuration(100);
+    expect(el.playbackRate).toBe(1);
   });
 
   it("a second play() replaces the first track", () => {

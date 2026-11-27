@@ -49,7 +49,7 @@
   <header>
     <a href="./index.html"><img class="logo" src="./assets/icon.png" alt="Meguri logo"></a>
     <h1>Privacy Policy</h1>
-    <p class="meta">Effective date: July 23, 2026</p>
+    <p class="meta">Effective date: November 17, 2026</p>
   </header>
 
   <div class="summary">
@@ -67,6 +67,14 @@
     bookmarks, play history) is kept in a local SQLite database.</li>
     <li>Thumbnails and preview images are generated and cached locally.</li>
     <li>Application settings are saved in a local configuration file.</li>
+    <li>When Meguri crashes or does not exit normally, a crash report and
+    crash dumps are kept locally. They are never sent automatically: you can
+    read the report and choose to copy it into a GitHub issue yourself. The
+    report summarizes the dumps (which process crashed, the exception, its
+    address and thread, the library and offset it happened in, the app's
+    name, version and install channel, and the names, versions and build IDs
+    of the loaded libraries) but holds none of their memory contents and no
+    folder paths.</li>
   </ul>
   <p>None of this data ever leaves your machine, and the developer has no
   access to it. Your media files themselves are only read, never modified.</p>
@@ -82,7 +90,9 @@
     processed by GitHub under the
     <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement">GitHub
     Privacy Statement</a>.</li>
-    <li>The automatic check on startup can be turned off in the app's
+    <li>The automatic check, run after startup and then every six hours
+    while the app is running (hourly while GitHub cannot be reached), can be
+    turned off in the app's
     settings; updates can then only be checked manually.</li>
   </ul>
   <p>All other network activity is confined to your own machine: media is
@@ -90,8 +100,8 @@
   <code>127.0.0.1</code>, which is not reachable from other devices.</p>
 
   <h2>Analytics and telemetry</h2>
-  <p>Meguri contains no analytics, telemetry, crash reporting, advertising,
-  or tracking of any kind. There are no user accounts and no cloud
+  <p>Meguri contains no analytics, telemetry, automatic crash reporting,
+  advertising, or tracking of any kind. There are no user accounts and no cloud
   services.</p>
 
   <h2>Third parties</h2>

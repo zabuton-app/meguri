@@ -1,6 +1,6 @@
 // How many times each file's thumbnail has been regenerated in this run, the
 // cache buster a list thumbnail puts in its URL (the WebP is rewritten in
-// place and served with a max-age, so only a new URL shows the new picture).
+// place, and an <img> loads its picture again only when the URL changes).
 //
 // Lives outside React and is read per file: Home used to keep it as state and
 // hand the whole record down, so every `thumb:done` flush during a scan
@@ -9,9 +9,10 @@
 // notifies the thumbnails of the files it names and nothing else.
 //
 // Home is the one writer: it listens for thumb:done and flushes batches here.
-// A MediaThumbnail given no `version` reads this store; views outside Home
-// that track regenerations their own way (Discover, the detail view) pass
-// their version explicitly.
+// A MediaThumbnail given no `version` and each Discover card read this store
+// (Discover is a child route of Home, so the listener is mounted with it);
+// the detail view tracks regenerations its own way and passes its version
+// explicitly.
 import { useCallback, useSyncExternalStore } from "react";
 import { mediaSortId } from "@/lib/mediaSortId";
 

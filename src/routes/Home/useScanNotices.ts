@@ -88,6 +88,13 @@ export function useScanNotices() {
         notifyRootUnreadable(done.workspaceId);
         return;
       }
+      if (done.errorReason === "exclusion-stuck") {
+        toast.error(t("home.scanExclusionStuck"), {
+          id: "scan-error",
+          description: t("home.scanExclusionStuckDesc"),
+        });
+        return;
+      }
       if (done.error) {
         toast.error(t("home.scanError"), { id: "scan-error" });
         return;

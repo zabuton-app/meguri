@@ -20,6 +20,7 @@ import {
   type MediaReorder,
 } from "@/components/MediaReorder";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { useScrollToPeek } from "@/hooks/useScrollToPeek";
 import { SelectionCheck } from "@/components/SelectionCheck";
 import { useSelectableClick } from "@/hooks/useSelectableClick";
 import { useFileDrag } from "@/hooks/useFileDrag";
@@ -106,6 +107,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** mediaSortId of the file a docked side peek shows: marked, and scrolled
+   *  into view each time it changes. */
+  peekFileKey?: string;
 }
 
 const noop = () => {};
@@ -132,6 +136,7 @@ export const MediaList = memo(function MediaList({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  peekFileKey,
 }: Props) {
   const watchLaterMembership = useWatchLater();
   const { listThumbSize } = usePreferences();
@@ -215,6 +220,20 @@ export const MediaList = memo(function MediaList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
 
+  // The row the docked peek shows, scrolled to once the list is loaded.
+  const peekIndex = peekFileKey
+    ? entries.findIndex(
+        (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
+      )
+    : -1;
+  const peekReady = useCallback(() => !loading, [loading]);
+  useScrollToPeek({
+    peekFileKey,
+    row: peekIndex,
+    ready: peekReady,
+    scrollToRow,
+  });
+
   // Fetch the next page when a row near the end becomes visible.
   useInfiniteScrollTrigger({
     virtualRows,
@@ -234,7 +253,7 @@ export const MediaList = memo(function MediaList({
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-2">
             <Skeleton
-              className={cn("aspect-video shrink-0 rounded-md", thumbWidth)}
+              className={cn("aspect-video shrink-0 rounded-item", thumbWidth)}
             />
             <div className="flex flex-1 flex-col gap-2">
               <Skeleton className="h-4 w-2/3" />
@@ -253,7 +272,13 @@ export const MediaList = memo(function MediaList({
 
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+      <FileContextMenu
+        items={items}
+        mediaBase={mediaBase}
+        workspaceId={wsId}
+        active={navActive}
+        onOpenFolder={onOpenFolder}
+      >
         <ScrollArea
           className="page-scroll h-full"
           viewportClassName="pt-4"
@@ -296,6 +321,7 @@ export const MediaList = memo(function MediaList({
                       thumbWidth={thumbWidth}
                       onTagClick={onTagClick}
                       focused={focused}
+                      peeked={vr.index === peekIndex}
                       watchLater={watchLaterMembership}
                       watchLaterRef={focused ? focusedWatchLaterRef : undefined}
                       fileDraggable={!reorder}
@@ -324,6 +350,7 @@ const MediaRow = memo(function MediaRow({
   thumbWidth,
   onTagClick,
   focused,
+  peeked,
   watchLater,
   watchLaterRef,
   fileDraggable,
@@ -336,6 +363,8 @@ const MediaRow = memo(function MediaRow({
   thumbWidth: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  /** The file the docked side peek shows. */
+  peeked?: boolean;
   watchLater: WatchLaterMembership;
   /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
@@ -381,16 +410,22 @@ const MediaRow = memo(function MediaRow({
       {...dragProps}
       data-slot="media-row"
       data-file-key={mediaSortId(file)}
-      aria-current={focused ? "true" : undefined}
+      // "page" marks the file the peek shows; the keyboard focus, which can
+      // be elsewhere, keeps "true" and wins on the row that has both.
+      aria-current={focused ? "true" : peeked ? "page" : undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "group @container relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",
-        selected && "bg-primary/10 ring-1 ring-inset ring-primary/50",
-        focused && "bg-primary/15 ring-2 ring-inset ring-primary",
+        "group @container relative flex items-center gap-4 rounded-card p-2 pr-4 transition-colors hover:bg-fg/10",
+        // The grid's vocabulary: a tint for selected, a ring for focus (#587),
+        // and a 1px outline for the file in the peek.
+        selected && "bg-primary/15 hover:bg-primary/25",
+        peeked && "ring-1 ring-inset ring-primary",
+        focused && "ring-2 ring-inset ring-primary",
       )}
     >
       <div
         className={cn(
-          "relative z-10 aspect-video shrink-0 overflow-hidden rounded-md bg-overlay text-muted",
+          "relative z-10 aspect-video shrink-0 overflow-hidden rounded-item bg-overlay text-muted",
           thumbWidth,
         )}
       >
@@ -407,7 +442,7 @@ const MediaRow = memo(function MediaRow({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
           {duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-[11px] leading-4 tabular-nums text-bright-fg">
+            <span className="absolute bottom-1 right-1 rounded-item bg-bg/80 px-1 text-2xs leading-4 tabular-nums text-bright-fg">
               {duration}
             </span>
           )}
@@ -427,7 +462,7 @@ const MediaRow = memo(function MediaRow({
         <HashLink
           to={fileHref(file.id, file.workspaceId, { autoplay: false })}
           onClick={onSelectableClick}
-          className="h-6 truncate text-[15px] font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
+          className="h-6 truncate text-sm font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
         >
           {/* The path tooltip is on the name only: on the link it would show
               over the whole row its overlay covers. */}
@@ -452,7 +487,7 @@ const MediaRow = memo(function MediaRow({
         </div>
       </div>
 
-      <div className="hidden shrink-0 grid-cols-[9.5rem_4rem_4.75rem] items-center gap-x-4 text-[13px] tabular-nums text-fg @3xl:grid">
+      <div className="hidden shrink-0 grid-cols-[9.5rem_4rem_4.75rem] items-center gap-x-4 text-xs tabular-nums text-fg @3xl:grid">
         <div className="flex min-w-0 items-center justify-end gap-2">
           {file.kind !== "video" && (
             <KindIcon
@@ -461,7 +496,7 @@ const MediaRow = memo(function MediaRow({
             />
           )}
           {badge && (
-            <span className="shrink-0 rounded border border-border-strong px-1 text-[10px] font-semibold leading-4 text-muted">
+            <span className="shrink-0 rounded-item border border-border-strong px-1 text-2xs font-semibold leading-4 text-muted">
               {badge}
             </span>
           )}

@@ -35,11 +35,13 @@ function CommandDialog({
   className,
   showCloseButton = false,
   onEscapeKeyDown,
+  style,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string;
   description?: string;
   className?: string;
+  style?: React.CSSProperties;
   showCloseButton?: boolean;
   /** preventDefault() keeps the dialog open (a sub-page stepping back). */
   onEscapeKeyDown?: React.ComponentProps<
@@ -55,6 +57,7 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
         onEscapeKeyDown={onEscapeKeyDown}
+        style={style}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{title}</DialogTitle>
@@ -69,33 +72,41 @@ function CommandDialog({
 function CommandInput({
   className,
   badge,
+  leading,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & {
   /** Shown before the field: where in the menu the input is searching. */
   badge?: React.ReactNode;
+  /** In the field ahead of its text (the search's chips). */
+  leading?: React.ReactNode;
 }) {
   return (
-    <div
-      data-slot="command-input-wrapper"
-      className="flex h-12 items-center gap-2 border-b border-border px-3"
-    >
-      <Search className="size-4 shrink-0 text-muted" />
-      {badge != null && (
-        <span
-          data-slot="command-input-badge"
-          className="max-w-[45%] shrink-0 truncate rounded-full bg-overlay px-2 py-0.5 text-xs text-fg"
-        >
-          {badge}
-        </span>
-      )}
-      <CommandPrimitive.Input
-        data-slot="command-input"
-        className={cn(
-          "flex h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50",
-          className,
+    // A field of its own inside the menu, as VS Code's quick pick has: the
+    // command menu lays it over the title bar's search (CommandMenu's
+    // FIELD_INSET is this p-1 plus the menu's border).
+    <div data-slot="command-input-wrapper" className="p-1">
+      {/* py-[3px] around the h-6 field and the border make the h-8 of the
+          title bar's search, which it lies over; chips wrap below. */}
+      <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1 rounded-control border border-ring bg-bg px-2 py-[3px]">
+        <Search className="size-3.5 shrink-0 text-muted" />
+        {leading}
+        {badge != null && (
+          <span
+            data-slot="command-input-badge"
+            className="max-w-[45%] shrink-0 truncate rounded-full bg-overlay px-2 py-0.5 text-xs text-fg"
+          >
+            {badge}
+          </span>
         )}
-        {...props}
-      />
+        <CommandPrimitive.Input
+          data-slot="command-input"
+          className={cn(
+            "flex h-6 min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50",
+            className,
+          )}
+          {...props}
+        />
+      </div>
     </div>
   );
 }
@@ -165,7 +176,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-2 text-sm outline-none",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-item px-2 py-2 text-sm outline-none",
         "data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}

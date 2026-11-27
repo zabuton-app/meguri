@@ -4,7 +4,7 @@
 export interface FileHrefOpts {
   /** Set to false to open the detail view paused (`?autoplay=0`). */
   autoplay?: boolean;
-  /** Initial seek position in seconds (e.g. Discovery scene click). 0 is
+  /** Initial seek position in seconds (e.g. the playlist handing over). 0 is
    *  carried too: it asks for the start over a stored resume point. */
   t?: number;
   /** Origin marker for the modal-close fallback (e.g. "discover"). */

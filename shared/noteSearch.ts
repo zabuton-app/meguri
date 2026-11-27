@@ -4,12 +4,14 @@
 //
 // Neither goes through the full-text index. The note lives in the library
 // every workspace shares, not in a workspace's files_fts, so they are
-// conditions on file_meta (see appendSearchConditions).
+// conditions on file_meta (see directiveCondition). The directives themselves
+// are read with the others, by parseSearchDirective in shared/tags.ts.
 
 export const NOTE_SEARCH_PREFIX = "note";
 
-/** The one `has:` directive there is. Any other `has:` value is free text. */
-export const HAS_NOTE_TOKEN = "has:note";
+/** `has:note`: the one value `has:` takes. Any other `has:` value is free text. */
+export const HAS_SEARCH_PREFIX = "has";
+export const HAS_NOTE_VALUE = "note";
 
 /**
  * The text of a `note:` token, or null when the token is something else.
@@ -22,13 +24,11 @@ export function parseNoteSearchToken(token: string): string | null {
   return value || null;
 }
 
+/** True for a `has:note` token, in any case, as `is:fav` is read. */
 export function isHasNoteToken(token: string): boolean {
-  return token.toLowerCase() === HAS_NOTE_TOKEN;
-}
-
-/** Whether a token is a note condition rather than text to find in names. */
-export function isNoteDirective(token: string): boolean {
-  return isHasNoteToken(token) || parseNoteSearchToken(token) !== null;
+  const head = `${HAS_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return false;
+  return token.slice(head.length).trim().toLowerCase() === HAS_NOTE_VALUE;
 }
 
 /**
@@ -41,13 +41,11 @@ export function noteSearchKey(text: string): string {
 }
 
 /**
- * Whether a note satisfies every `note:` token of a query: for each group
- * (one token's alternatives, already passed through noteSearchKey), the note
- * contains at least one. SQL reaches it as `note_match(note, groupsJson)`
- * (see db.ts), so a note is folded once per row however many tokens and
- * alternatives the query has.
+ * Whether a note contains any of one `note:` token's alternatives, already
+ * passed through noteSearchKey. SQL reaches it as `note_match(note, termsJson)`
+ * (see db.ts), once per row and token.
  */
-export function noteMatches(note: string, groups: string[][]): boolean {
+export function noteMatches(note: string, terms: string[]): boolean {
   const key = noteSearchKey(note);
-  return groups.every((any) => any.some((term) => key.includes(term)));
+  return terms.some((term) => key.includes(term));
 }

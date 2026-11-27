@@ -81,19 +81,21 @@ html[data-appearance="light"] {
   outline-offset: 2px;
 }
 
-/* Bars: flat, set apart by a solid line instead of a tint. */
-[data-slot="workspace-rail"],
-[data-slot="home-header"],
+/* Bars: flat, set apart by a solid line instead of a tint. The frame (the
+   title bar and the rail) takes its color from --c-chrome, which also fills
+   the corners around the content panel. */
+html[data-appearance] {
+  --c-chrome: var(--c-bg);
+}
 [data-slot="filter-bar"],
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
   background-color: var(--c-bg);
 }
-[data-slot="workspace-rail"] {
-  border-right: 2px solid var(--c-border-strong);
-}
-[data-slot="home-header"] {
-  border-bottom: 2px solid var(--c-border-strong);
+/* The line around the content is the content panel's border, which follows
+   its rounded corners; one on the rail or the title bar would not. */
+[data-slot="content-panel"] {
+  border: 2px solid var(--c-border-strong);
 }
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
@@ -102,8 +104,8 @@ html[data-appearance="light"] {
 }
 
 /* Files and folders: a thicker frame. Only the width changes, so the card's
-   selected border color (--c-primary) and the selection rings (box-shadow)
-   still show. The focused file gets the heavy outline too. */
+   selected border color (--c-primary) and the focus ring (box-shadow) still
+   show. The focused file gets the heavy outline too. */
 [data-slot="media-card"],
 [data-slot="folder-card"] {
   border-width: 2px;

@@ -18,7 +18,11 @@ try {
   await sleep(1200);
 
   // 1) scroll the grid
-  await page.locator("main").first().hover().catch(() => {});
+  await page
+    .locator("main")
+    .first()
+    .hover()
+    .catch(() => {});
   for (let i = 0; i < 6; i += 1) {
     await page.mouse.wheel(0, 120);
     await sleep(220);
@@ -31,12 +35,13 @@ try {
   await sleep(600);
 
   // 2) incremental search
-  const search = page.locator("#list-search-input");
-  await search.click();
+  // The title bar's search opens the command menu, where it is typed.
+  await page.locator('[data-slot="search-trigger"] button').first().click();
+  const search = page.locator('[data-slot="command-input"]');
   await search.pressSequentially("jellyfish", { delay: 90 });
+  await page.keyboard.press("Enter");
   await sleep(1400);
-  await search.fill("");
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Clear search" }).click();
   await sleep(700);
 
   // 3) open a video detail and let it play
@@ -47,7 +52,10 @@ try {
   await videoCard.hover();
   await sleep(600);
   const name = (await videoCard.innerText()).match(/\S+\.mp4/)?.[0] ?? ".mp4";
-  await page.getByRole("link", { name: new RegExp(name) }).first().click();
+  await page
+    .getByRole("link", { name: new RegExp(name) })
+    .first()
+    .click();
   await page.getByRole("dialog").waitFor();
   await sleep(4500);
   await page.keyboard.press("Escape");

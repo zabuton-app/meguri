@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { GRID_BINDINGS, matchAny } from "@/settings/keybindings";
+import { isTyping } from "@/lib/keyTarget";
 
 interface Options {
   /** Number of items currently loaded. */
@@ -105,14 +106,7 @@ export function useGridKeyboardNav({
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       const {
         itemCount,
         columns,

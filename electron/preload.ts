@@ -5,6 +5,12 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 // (__ELECTRON_LOG__ / __ELECTRON_LOG_IPC__). Independent of the API whitelist below.
 import "electron-log/preload";
 import {
+  APP_GLYPH_ARG,
+  APP_NAME_ARG,
+  EXTRA_EVENT_CHANNELS_ARG,
+  EXTRA_INVOKE_CHANNELS_ARG,
+  MEDIA_ORIGIN_ARG,
+  STARTUP_ORIGIN_ARG,
   EVENT_CHANNELS as EVENT_CHANNEL_NAMES,
   INVOKE_CHANNELS as INVOKE_CHANNEL_NAMES,
   type PreloadInvokeChannel,
@@ -13,11 +19,40 @@ import {
 // Whitelist of allowed IPC channel names. The preload is the security boundary
 // between the renderer and the main process; without this check, a renderer-side
 // XSS (or a compromised dependency) could call any ipcMain.handle channel.
-// Lists are sourced from shared/ipc/channelNames.ts (same as channels.ts).
-const INVOKE_CHANNELS = new Set<string>(INVOKE_CHANNEL_NAMES);
-const EVENT_CHANNELS = new Set<string>(EVENT_CHANNEL_NAMES);
+// Lists are sourced from shared/ipc/channelNames.ts (same as channels.ts), plus
+// the app's own `extraChannels`, which only main can pass (startApp()).
+const INVOKE_CHANNELS = new Set<string>([
+  ...INVOKE_CHANNEL_NAMES,
+  ...argList(EXTRA_INVOKE_CHANNELS_ARG),
+]);
+const EVENT_CHANNELS = new Set<string>([
+  ...EVENT_CHANNEL_NAMES,
+  ...argList(EXTRA_EVENT_CHANNELS_ARG),
+]);
+
+/** The value main passed as `<prefix><value>` (additionalArguments). */
+function argValue(prefix: string): string {
+  return (
+    process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ??
+    ""
+  );
+}
+
+/** A comma-separated argument (extraChannelArgs()) as a list. */
+function argList(prefix: string): string[] {
+  return argValue(prefix).split(",").filter(Boolean);
+}
 
 contextBridge.exposeInMainWorld("api", {
+  /** The app's name and one-character mark, as passed to startApp() (electron/app.ts). */
+  appName: argValue(APP_NAME_ARG),
+  appGlyph: argValue(APP_GLYPH_ARG),
+  /** The media server's origin, for the renderer's CSP (public/media-csp.js). */
+  mediaOrigin: argValue(MEDIA_ORIGIN_ARG),
+  /** When the main process started (epoch ms), for the startup timings. */
+  startupOrigin: Number(argValue(STARTUP_ORIGIN_ARG)),
+  /** The OS, for the custom title bar's layout (TitleBar.tsx). */
+  platform: process.platform,
   /** Command invocation (maps to ipcMain.handle). */
   invoke: (channel: string, args?: unknown) => {
     if (!INVOKE_CHANNELS.has(channel)) {

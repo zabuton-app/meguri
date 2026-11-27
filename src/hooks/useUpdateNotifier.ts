@@ -10,9 +10,6 @@ export function useUpdateNotifier(): void {
   const { t } = useI18n();
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let active = true;
-
     const show = (info: UpdateInfo) => {
       toast.info(t("update.available", { version: info.latest }), {
         id: "update-available",
@@ -29,15 +26,6 @@ export function useUpdateNotifier(): void {
       });
     };
 
-    void events.onUpdateAvailable(show).then((un) => {
-      // The component may have unmounted before the (sync) listener resolved.
-      if (active) unlisten = un;
-      else un();
-    });
-
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+    return events.onUpdateAvailable(show);
   }, [t]);
 }

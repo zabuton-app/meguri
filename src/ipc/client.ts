@@ -3,6 +3,7 @@
 // Channel signatures (input + output types) come from shared/ipc/channels.ts,
 // which is also what main validates against — so the renderer wrapper and the
 // main handler cannot drift apart.
+import type { ExclusionPattern } from "@shared/scanExclusions";
 import type {
   AboutInfo,
   ChannelInput,
@@ -11,6 +12,7 @@ import type {
   CssThemesState,
   CustomCssChanged,
   CustomCssState,
+  WindowState,
 } from "@shared/ipc/channels";
 import type { PreloadInvokeChannel } from "@shared/ipc/channelNames";
 import type {
@@ -107,6 +109,18 @@ export const api = {
     targets: ChannelInput<"collection_set_membership">["targets"],
     op: ChannelInput<"collection_set_membership">["op"],
   ) => invoke("collection_set_membership", { collectionId, targets, op }),
+  smartCollectionsList: () => invoke("smart_collections_list"),
+  smartCollectionsImport: (
+    collections: ChannelInput<"smart_collections_import">["collections"],
+    defaultId: string | null,
+  ) => invoke("smart_collections_import", { collections, defaultId }),
+  smartCollectionAdd: (
+    collection: ChannelInput<"smart_collection_add">["collection"],
+  ) => invoke("smart_collection_add", { collection }),
+  smartCollectionRemove: (id: string) =>
+    invoke("smart_collection_remove", { id }),
+  smartCollectionSetDefault: (id: string | null) =>
+    invoke("smart_collection_set_default", { id }),
   scanStart: (includeExcluded?: boolean, rebuild?: boolean) =>
     invoke("scan_start", { includeExcluded, rebuild }),
   scanCancel: (wsId?: string) => invoke("scan_cancel", { wsId }),
@@ -141,6 +155,14 @@ export const api = {
   ) => invoke("graph_layout_set", { scope, keys, xy, dims }),
   fileGet: (id: number, workspaceId: string) =>
     invoke("file_get", { id, workspaceId }),
+  fileDownloadOrigin: (id: number, workspaceId: string) =>
+    invoke("file_download_origin", { id, workspaceId }),
+  fileSubtitles: (
+    id: number,
+    workspaceId: string,
+    track: number,
+    windowStart: number,
+  ) => invoke("file_subtitles", { id, workspaceId, track, windowStart }),
   fileSetRating: (id: number, workspaceId: string, rating: number) =>
     invoke("file_set_rating", { id, workspaceId, rating }),
   fileSetFavorite: (id: number, workspaceId: string, favorite: boolean) =>
@@ -197,6 +219,11 @@ export const api = {
   historyClear: () => invoke("history_clear"),
   /** Duplicate groups by (content_hash, size) — same scope rule as historyList. */
   duplicatesList: () => invoke("duplicates_list"),
+  /** Files a scan no longer found on disk — same scope rule as historyList. */
+  missingFilesList: () => invoke("missing_files_list"),
+  missingFilesPurge: (
+    targets: ChannelInput<"missing_files_purge">["targets"],
+  ) => invoke("missing_files_purge", { targets }),
   bookmarkAdd: (id: number, workspaceId: string, sec: number) =>
     invoke("bookmark_add", { id, workspaceId, sec }),
   bookmarkRemove: (id: number, workspaceId: string, bookmarkId: number) =>
@@ -225,12 +252,28 @@ export const api = {
   openDevTools: () => invoke("open_devtools"),
   /** Close the main window (hides to tray when tray support is enabled). */
   windowClose: () => invoke("window_close"),
+  windowMinimize: () => invoke("window_minimize"),
+  windowToggleMaximize: () => invoke("window_toggle_maximize"),
+  windowState: () => invoke("window_state"),
+  /** A double click on the title bar (macOS: main applies the system setting). */
+  windowTitleBarDoubleClick: () => invoke("window_title_bar_double_click"),
+  /** Place macOS's traffic lights at (x, y) in the window (macOS only). */
+  windowSetButtonPosition: (x: number, y: number) =>
+    invoke("window_set_button_position", { x, y }),
+  /** Show or hide macOS's traffic lights (macOS only). */
+  windowSetButtonVisibility: (visible: boolean) =>
+    invoke("window_set_button_visibility", visible),
   /** Check GitHub for a newer release. `force` bypasses the throttle. null = check failed. */
   updateCheck: (force?: boolean) => invoke("update_check", { force }),
   updateGetSettings: () => invoke("update_get_settings"),
   updateSetAutoCheck: (enabled: boolean) =>
     invoke("update_set_auto_check", { enabled }),
   updateIgnore: (version: string) => invoke("update_ignore", { version }),
+  crashReportsList: () => invoke("crash_reports_list"),
+  /** Delete a crash report and the crash dumps of its run. */
+  crashReportDelete: (id: string) => invoke("crash_report_delete", { id }),
+  /** Open the folder the crash dumps are kept in. */
+  crashReportsOpenFolder: () => invoke("crash_reports_open_folder"),
   /** Auto-tagging (rules, dictionary, applying), configured app-wide. */
   autoTagGet: () => invoke("auto_tag_get"),
   autoTagSet: (config: AutoTagConfig) => invoke("auto_tag_set", { config }),
@@ -248,15 +291,33 @@ export const api = {
   ) => invoke("auto_tag_edit", { targets, add, remove }),
   autoTagUndo: (undoIds: string[]) => invoke("auto_tag_undo", { undoIds }),
   autoTagReapply: () => invoke("auto_tag_reapply"),
-  /** App logo variant (window + tray icon), persisted in main's config.json. */
+  /** App logo variant (window + tray icon), persisted in main's settings. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
-  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
+  /** The in-app logo of each variant, as a data URL. */
+  logoImages: () => invoke("logo_images"),
+  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's settings. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>
     invoke("custom_css_set_enabled", { enabled }),
   customCssOpen: () => invoke("custom_css_open"),
-  /** CSS theme files in <userData>/themes; the pick is persisted in main's config.json. */
+  /** Scan exclusions (#282); saving hides what the patterns cover at once. */
+  scanExclusionsGet: () => invoke("scan_exclusions_get"),
+  scanExclusionsSetPatterns: (patterns: ExclusionPattern[]) =>
+    invoke("scan_exclusions_set_patterns", { patterns }),
+  scanExclusionsFolders: (workspaceId: string) =>
+    invoke("scan_exclusions_folders", { workspaceId }),
+  scanExclusionsAddFolder: (workspaceId: string, path: string) =>
+    invoke("scan_exclusions_add_folder", { workspaceId, path }),
+  scanExclusionsUpdateFolders: (
+    workspaceId: string,
+    change: { add: string[]; remove: string[] },
+  ) => invoke("scan_exclusions_update_folders", { workspaceId, ...change }),
+  scanExclusionsPickFolder: (workspaceId: string) =>
+    invoke("scan_exclusions_pick_folder", { workspaceId }),
+  scanExclusionsPreview: (pattern: ExclusionPattern) =>
+    invoke("scan_exclusions_preview", { pattern }),
+  /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),
   cssThemesOpenFolder: () => invoke("css_themes_open_folder"),
@@ -281,35 +342,28 @@ export type {
   UpdateInfo,
 };
 
-// Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
+// bridge.on subscribes synchronously, so the unlisten function is returned
+// directly: an effect can hand it straight back as its cleanup.
 type Unlisten = () => void;
 export const events = {
-  onScanProgress: (cb: (p: ScanProgress) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("scan:progress", (p) => cb(p as ScanProgress))),
-  onThumbDone: (cb: (event: ThumbDone) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("thumb:done", (p) => cb(p as ThumbDone))),
-  onScanDone: (cb: (d: ScanDone) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("scan:done", (p) => cb(p as ScanDone))),
-  onWorkspaceChanged: (
-    cb: (activeId: string | null) => void,
-  ): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("workspace:changed", (p) =>
-        cb((p as { activeId: string | null }).activeId),
-      ),
+  onScanProgress: (cb: (p: ScanProgress) => void): Unlisten =>
+    bridge.on("scan:progress", (p) => cb(p as ScanProgress)),
+  onThumbDone: (cb: (event: ThumbDone) => void): Unlisten =>
+    bridge.on("thumb:done", (p) => cb(p as ThumbDone)),
+  onScanDone: (cb: (d: ScanDone) => void): Unlisten =>
+    bridge.on("scan:done", (p) => cb(p as ScanDone)),
+  onWorkspaceChanged: (cb: (activeId: string | null) => void): Unlisten =>
+    bridge.on("workspace:changed", (p) =>
+      cb((p as { activeId: string | null }).activeId),
     ),
-  onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
-  onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
-    ),
-  onCssThemesChanged: (cb: (s: CssThemesState) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
-    ),
-  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
-    ),
+  onUpdateAvailable: (cb: (info: UpdateInfo) => void): Unlisten =>
+    bridge.on("update:available", (p) => cb(p as UpdateInfo)),
+  onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Unlisten =>
+    bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
+  onCssThemesChanged: (cb: (s: CssThemesState) => void): Unlisten =>
+    bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
+  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Unlisten =>
+    bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
+  onWindowState: (cb: (s: WindowState) => void): Unlisten =>
+    bridge.on("window:state", (p) => cb(p as WindowState)),
 };

@@ -68,27 +68,27 @@ html[data-appearance="light"] {
 
 /* ---- Both variants ------------------------------------------------------ */
 
-/* Flat chrome: the bars blend into the page, set apart by a hairline only. */
-[data-slot="workspace-rail"],
-[data-slot="home-header"],
+/* Flat chrome: the bars blend into the page, set apart by a hairline only.
+   The frame (the title bar and the rail) takes its color from --c-chrome,
+   which also fills the corners around the content panel. */
+html[data-appearance] {
+  --c-chrome: var(--c-bg);
+}
 [data-slot="filter-bar"],
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
   background-color: var(--c-bg);
 }
-[data-slot="workspace-rail"] {
-  border-right: 1px solid var(--c-border);
-}
-[data-slot="home-header"] {
-  border-bottom: 1px solid var(--c-border);
-}
+/* The content panel's own border (--c-border) is the hairline between the
+   bars and the content: a line on the rail or the title bar would run
+   straight past the panel's rounded corner. */
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
   border-top: 1px solid var(--c-border);
 }
 
-/* The focus marker is an outline, so the app's own selection rings
-   (box-shadow) and the card's selected border stay as they are. */
+/* The focus marker is an outline, so the app's own focus ring (box-shadow)
+   and the card's selected border and background stay as they are. */
 [data-slot="media-card"][aria-current="true"],
 [data-slot="media-row"][aria-current="true"] {
   outline: 1px solid var(--c-bright-fg);

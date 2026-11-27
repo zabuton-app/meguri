@@ -5,17 +5,26 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// workspaces.ts reads/writes <userData>/config.json via appConfig.ts; point that
-// at a throwaway directory so each test gets a pristine config.
+// workspaces.ts reads/writes its settings in <userData>/library.sqlite via
+// appConfig.ts; point that at a throwaway directory so each test gets a
+// pristine config.
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 
 const { Workspaces } = await import("../workspaces.js");
 const { WATCH_LATER_ID } = await import("../../../shared/workspaceIds.js");
 const { loadConfig, saveConfig } = await import("../appConfig.js");
+const { loadCollections } = await import("../collectionStore.js");
+const { openLibraryReadonlyOrThrow, openSettingsDb } = await import("../db.js");
 
-function configFile(): string {
-  return path.join(userData, "config.json");
+/** Change the stored collections behind the app's back (a hand edit). */
+function editStored(sql: string, ...params: unknown[]): void {
+  const db = openSettingsDb(path.join(userData, "library.sqlite"));
+  try {
+    db.prepare(sql).run(...params);
+  } finally {
+    db.close();
+  }
 }
 
 beforeEach(() => {
@@ -37,7 +46,7 @@ describe("Watch Later seeding", () => {
 
   it("persists the seeded collection to disk", () => {
     new Workspaces();
-    const onDisk = loadConfig().collections;
+    const onDisk = loadCollections();
     expect(onDisk.filter((c) => c.id === WATCH_LATER_ID)).toHaveLength(1);
   });
 
@@ -54,13 +63,9 @@ describe("Watch Later seeding", () => {
     const first = new Workspaces();
     first.addToCollection(WATCH_LATER_ID, "wsA", 1);
 
-    // Simulate a hand-edited / older-build config with no Watch Later entry.
-    const config = loadConfig();
-    config.collections = config.collections.filter(
-      (c) => c.id !== WATCH_LATER_ID,
-    );
-    saveConfig(config);
-    expect(loadConfig().collections).toHaveLength(0);
+    // Simulate a hand edit that removed the Watch Later entry.
+    editStored("DELETE FROM collections WHERE id = ?", WATCH_LATER_ID);
+    expect(loadCollections()).toHaveLength(0);
 
     const ws = new Workspaces();
     const watchLater = ws.collections().find((c) => c.id === WATCH_LATER_ID);
@@ -74,13 +79,13 @@ describe("Watch Later seeding", () => {
     const first = new Workspaces();
     first.addToCollection(WATCH_LATER_ID, "wsA", 1);
 
-    // Simulate a hand-edited config where `locked` was stripped. Without repair
+    // Simulate a hand edit where `locked` was stripped. Without repair
     // the entry passes the "already exists" check while isLocked() reports
     // false, leaving it renamable/removable.
-    const config = loadConfig();
-    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
-    delete watchLater.locked;
-    saveConfig(config);
+    editStored(
+      "UPDATE collections SET locked = 0 WHERE id = ?",
+      WATCH_LATER_ID,
+    );
 
     const ws = new Workspaces();
     const repaired = ws.collections().find((c) => c.id === WATCH_LATER_ID);
@@ -98,16 +103,16 @@ describe("Watch Later seeding", () => {
 
   it("persists the repaired lock so it survives a reload", () => {
     new Workspaces();
-    const config = loadConfig();
-    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
-    delete watchLater.locked;
-    saveConfig(config);
+    editStored(
+      "UPDATE collections SET locked = 0 WHERE id = ?",
+      WATCH_LATER_ID,
+    );
 
     new Workspaces();
 
-    expect(
-      loadConfig().collections.find((c) => c.id === WATCH_LATER_ID)?.locked,
-    ).toBe(true);
+    expect(loadCollections().find((c) => c.id === WATCH_LATER_ID)?.locked).toBe(
+      true,
+    );
   });
 
   it("keeps existing user collections and their contents untouched", () => {
@@ -124,11 +129,20 @@ describe("Watch Later seeding", () => {
     expect(reloaded?.locked).toBe(false);
   });
 
-  it("does not rewrite config.json when the collection already exists", () => {
+  it("does not write the settings when the collection already exists", () => {
     new Workspaces();
-    const before = fs.readFileSync(configFile(), "utf8");
-    new Workspaces();
-    expect(fs.readFileSync(configFile(), "utf8")).toBe(before);
+    // data_version moves when another connection commits a change.
+    const reader = openLibraryReadonlyOrThrow(
+      path.join(userData, "library.sqlite"),
+    );
+    try {
+      const version = () => reader.pragma("data_version", { simple: true });
+      const before = version();
+      new Workspaces();
+      expect(version()).toBe(before);
+    } finally {
+      reader.close();
+    }
   });
 });
 
@@ -438,5 +452,35 @@ describe("updateCollectionMembership", () => {
     ws.updateCollectionMembership(WATCH_LATER_ID, files("wsA", 1), "add");
     expect(idsOf(ws, mine.id)).toEqual(["wsA:1", "wsA:2"]);
     expect(idsOf(ws, WATCH_LATER_ID)).toEqual(["wsA:1"]);
+  });
+});
+
+describe("removeFilesFromAllCollections (missing files removed, #277)", () => {
+  const itemsOf = (ws: InstanceType<typeof Workspaces>, id: string) =>
+    ws.collections().find((c) => c.id === id)?.items ?? [];
+
+  it("drops the given files of one workspace from every collection", () => {
+    const ws = new Workspaces();
+    const mine = ws.addCollection("Mine");
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 1);
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 2);
+    ws.addToCollection(mine.id, "wsA", 2);
+    ws.addToCollection(mine.id, "wsA", 3);
+    ws.addToCollection(mine.id, "wsB", 2);
+
+    expect(ws.removeFilesFromAllCollections("wsA", [1, 2])).toBe(true);
+    const reloaded = new Workspaces();
+    expect(itemsOf(reloaded, WATCH_LATER_ID)).toEqual([]);
+    expect(itemsOf(reloaded, mine.id)).toEqual([
+      expect.objectContaining({ workspaceId: "wsA", fileId: 3 }),
+      expect.objectContaining({ workspaceId: "wsB", fileId: 2 }),
+    ]);
+  });
+
+  it("reports false when none of the files was in a collection", () => {
+    const ws = new Workspaces();
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 1);
+    expect(ws.removeFilesFromAllCollections("wsA", [5, 6])).toBe(false);
+    expect(ws.removeFilesFromAllCollections("wsA", [])).toBe(false);
   });
 });

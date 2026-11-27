@@ -6,6 +6,7 @@
 // workspaceId, which crossWorkspace.ts stamps on.
 import type { DB } from "../db.js";
 import { FILE_COLS, FILE_FROM, attachTags } from "./files.js";
+import { attachBookmarkSecs } from "./bookmarks.js";
 import {
   FOLDER_FILE_FROM,
   PINNED_FILES,
@@ -187,6 +188,7 @@ export function folderFiles(
       // The bulk tag dialog tallies the selection's tags from its rows, so
       // a folder's files need theirs like any row from the list.
       attachTags(db, found);
+      attachBookmarkSecs(db, found);
       budget -= found.length;
     }
     return { path, total, rows: found };

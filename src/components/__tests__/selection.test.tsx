@@ -152,6 +152,14 @@ describe("selection", () => {
     expect(checkboxes()[0].getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("marks a selected card with data-selected, for CSS themes", () => {
+    renderGrid();
+    fireEvent.click(checkboxes()[0]);
+    const cards = screen.getAllByTestId("media-card");
+    expect(cards[0].hasAttribute("data-selected")).toBe(true);
+    expect(cards[1].hasAttribute("data-selected")).toBe(false);
+  });
+
   it("toggles the same file back off", () => {
     renderGrid();
     fireEvent.click(checkboxes()[0]);
@@ -475,7 +483,11 @@ describe("selection", () => {
         renderWithProviders(
           <SelectionProvider items={many} scope="one">
             <Starter />
-            <SelectionBar onEditTags={() => {}} onExit={() => {}} />
+            <SelectionBar
+              onEditTags={() => {}}
+              onCompare={() => {}}
+              onExit={() => {}}
+            />
           </SelectionProvider>,
         );
         fireEvent.click(screen.getByRole("button", { name: "start" }));
@@ -494,7 +506,7 @@ describe("selection", () => {
 
       it("says why, on each of them", () => {
         renderOverCap();
-        const limit = `Up to ${MAX_BULK_FILES} files per edit. Narrow the selection.`;
+        const limit = `Up to ${MAX_BULK_FILES.toLocaleString("en")} files per edit. Narrow the selection.`;
         expect(screen.getAllByTitle(limit).length).toBeGreaterThanOrEqual(3);
       });
     });
@@ -566,14 +578,15 @@ describe("selection", () => {
       });
 
       it("suppresses the effects under prefers-reduced-motion, still writing", async () => {
-        const orig = window.matchMedia;
-        window.matchMedia = (query: string) =>
-          ({
-            matches: query.includes("prefers-reduced-motion"),
-            media: query,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList;
+        const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+          (query: string) =>
+            ({
+              matches: query.includes("prefers-reduced-motion"),
+              media: query,
+              addEventListener: () => {},
+              removeEventListener: () => {},
+            }) as unknown as MediaQueryList,
+        );
         try {
           renderGrid({ first: mixedFavorites });
           selectAll();
@@ -583,7 +596,7 @@ describe("selection", () => {
           expect(settling().length).toBe(0);
           await waitFor(() => expect(mocks.filesBulkMeta).toHaveBeenCalled());
         } finally {
-          window.matchMedia = orig;
+          matchMedia.mockRestore();
         }
       });
     });
@@ -1062,7 +1075,7 @@ describe("folder selection", () => {
       await Promise.resolve();
     });
     expect(selectedCount()).toBe(3);
-    expect(within(bar()!).getByText("including 1 folders")).toBeTruthy();
+    expect(within(bar()!).getByText("including 1 folder")).toBeTruthy();
     expect(
       within(bar()!).getByRole("button", { name: /Edit tags/ }),
     ).toHaveProperty("disabled", false);

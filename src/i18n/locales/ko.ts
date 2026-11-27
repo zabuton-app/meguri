@@ -1,14 +1,20 @@
 // 한국어 카탈로그. ja.ts 와 완전히 동일한 키 집합을 다뤄야 함 (타입으로 강제).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const ko: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
+export const ko: Catalog = {
   // common
   "common.close": "닫기",
+  "common.retry": "다시 시도",
   "common.cancel": "취소",
   "common.ok": "확인",
+  "common.actionFailed": "작업에 실패했습니다",
+  "common.experimental":
+    "실험적인 기능입니다. 이후 버전에서 바뀌거나 없어질 수 있습니다",
+
+  // window
+  "window.minimize": "최소화",
+  "window.maximize": "최대화",
+  "window.restore": "이전 크기로 복원",
 
   // kind
   "kind.video": "동영상",
@@ -32,6 +38,9 @@ export const ko: Record<TranslationKey, string> = {
   "settings.light": "라이트",
   "settings.dark": "다크",
   "settings.theme": "테마",
+  "settings.randomThemeOnStartup": "시작할 때 무작위 테마 선택",
+  "settings.randomThemeOnStartupDesc":
+    "시작할 때마다 현재 모양에 맞는 다른 기본 테마를 선택합니다. 선택한 CSS 테마는 해제됩니다.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "라이트 모드로 전환",
@@ -46,6 +55,9 @@ export const ko: Record<TranslationKey, string> = {
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
+  "settings.filmstripFrames": "필름스트립 프레임 수",
+  "settings.filmstripFramesDesc":
+    "필름스트립 보기에서 한 줄에 놓을 프레임 수입니다.",
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
@@ -61,6 +73,12 @@ export const ko: Record<TranslationKey, string> = {
   "settings.listThumbSizeSmall": "작게",
   "settings.listThumbSizeMedium": "보통",
   "settings.listThumbSizeLarge": "크게",
+  "settings.windowButtons": "창 버튼",
+  "settings.windowButtonsDesc":
+    "최소화·최대화·닫기 버튼을 둘 위치. 타일링 등 창 관리자로 창을 다룬다면 숨길 수도 있음",
+  "settings.windowButtonsLeft": "왼쪽",
+  "settings.windowButtonsRight": "오른쪽",
+  "settings.windowButtonsNone": "없음",
   "settings.emojiStyle": "이모지 스타일",
   "settings.emojiStyleDesc":
     "이모지 아이콘과 텍스트 속 이모지의 모양을 전환합니다.",
@@ -78,6 +96,58 @@ export const ko: Record<TranslationKey, string> = {
     "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",
   "settings.customCssOpen": "파일 열기",
   "settings.customCssOpenError": "custom.css를 열 수 없습니다.",
+  "settings.tabScan": "스캔",
+  "settings.scanExclusions": "패턴으로 제외",
+  "settings.scanExclusionsDesc":
+    "모든 워크스페이스에서 스캔에서 제외할 파일과 폴더입니다. 대소문자는 구분하지 않습니다.",
+  "settings.scanExclusionsNextScan":
+    "저장하면 패턴에 해당하는 색인된 파일이 숨겨집니다. 제거한 패턴의 파일은 다음 스캔에서 돌아옵니다.",
+  "settings.scanExclusionsSave": "저장",
+  "settings.scanExclusionsSaved": "스캔 제외 설정을 저장했습니다.",
+  "settings.scanExclusionsSaveError": "스캔 제외 설정을 저장할 수 없습니다.",
+  "settings.scanExclusionsPattern": "패턴 {n}",
+  "settings.scanExclusionsRemove": "패턴 {n} 삭제",
+  "settings.scanExclusionsAdd": "추가할 패턴",
+  "settings.scanExclusionsNone": "패턴이 없습니다.",
+  "settings.scanExclusionsPresets": "자주 쓰는 패턴:",
+  "settings.scanExclusionsPresetAdd": "{pattern} 사용",
+  "settings.scanExclusionsKind": "방식",
+  "settings.scanExclusionsKindName": "이름",
+  "settings.scanExclusionsKindContains": "포함",
+  "settings.scanExclusionsKindRegex": "정규식",
+  "settings.scanExclusionsKindNameHint":
+    "이 이름의 파일과 폴더를 어느 깊이에서든 제외합니다. 폴더는 안의 항목도 함께 제외됩니다. *는 임의의 문자열입니다(*.tmp 등). /를 넣으면(work/private, /private) 워크스페이스 폴더 기준 경로가 되고, 끝에 /를 붙이면(private/) 폴더만 제외합니다.",
+  "settings.scanExclusionsKindContainsHint":
+    "경로 어딘가에 이 문자열이 있는 항목을 제외합니다. 이름의 일부에도 일치합니다(temp는 attempt.mp4에도 일치).",
+  "settings.scanExclusionsKindRegexHint":
+    "정규식입니다. 워크스페이스 폴더 기준 경로에 적용합니다. 폴더 경로는 끝이 /입니다.",
+  "settings.scanExclusionsAddAction": "추가",
+  "settings.scanExclusionsDuplicate": "이미 목록에 있는 패턴입니다.",
+  "settings.scanExclusionsPreviewHint":
+    "패턴을 입력하면 이미 가져온 파일 중 일치하는 파일을 표시합니다.",
+  "settings.scanExclusionsPreviewLoading": "일치하는 파일을 찾는 중…",
+  "settings.scanExclusionsPreviewError": "일치하는 파일을 찾지 못했습니다.",
+  "settings.scanExclusionsPreviewNone":
+    "가져온 파일 중 일치하는 파일이 없습니다.",
+  "settings.scanExclusionsPreviewCount":
+    "파일 {count}개가 일치합니다. 추가하고 저장하면 숨겨집니다.",
+  "settings.scanExclusionsPreviewList": "일치하는 파일",
+  "settings.scanExclusionsPreviewMore": "외 {count}개",
+  "settings.scanExclusionsTestTimedOut":
+    "이 패턴은 시간 안에 끝나지 않았습니다. 스캔을 멈추게 하므로 추가할 수 없습니다.",
+  "settings.folderExclusions": "폴더로 제외",
+  "settings.folderExclusionsDesc":
+    "워크스페이스마다 지정한 폴더만 제외합니다. 폴더 보기에서 폴더를 마우스 오른쪽 버튼으로 클릭해 추가할 수 있습니다.",
+  "settings.folderExclusionsCount": "폴더 {count}개",
+  "settings.folderExclusionsNone": "없음",
+  "settings.folderExclusionsNotFound": "{count}개 찾을 수 없음",
+  "settings.folderExclusionsManage": "관리",
+  "settings.folderExclusionsManageLabel": "{name}의 제외 폴더 관리",
+  "settings.folderExclusionsLoadError": "제외 폴더를 읽지 못했습니다.",
+  "settings.folderExclusionsNoWorkspaces": "워크스페이스가 없습니다.",
+  "settings.scanExclusionsGlobal": "전역",
+  "settings.folderExclusionsPerWorkspace": "워크스페이스별",
+  "settings.scanExclusionsLoadError": "스캔 제외 설정을 읽지 못했습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",
@@ -93,7 +163,7 @@ export const ko: Record<TranslationKey, string> = {
   "settings.update": "업데이트",
   "settings.updateDesc": "새 버전이 있는지 확인합니다.",
   "settings.updateCheckNow": "지금 확인",
-  "settings.updateAuto": "시작할 때 자동으로 확인",
+  "settings.updateAuto": "자동으로 확인",
   "update.available": "버전 {version}을(를) 사용할 수 있습니다",
   "update.availableDesc": "현재 버전: {current}",
   "update.view": "릴리스 열기",
@@ -119,15 +189,14 @@ export const ko: Record<TranslationKey, string> = {
   "library.restored":
     "라이브러리가 손상되어 {date} 시점의 사본으로 복원했습니다",
   "library.restoredDesc":
-    "그 이후에 바꾼 즐겨찾기, 평점, 태그 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
+    "그 이후에 바꾼 즐겨찾기, 평점, 태그, 워크스페이스, 컬렉션, 설정 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
   "config.movedAside":
     "설정 파일(config.json)이 손상되어 기본 설정으로 시작했습니다",
   "config.movedAsideDesc":
     "등록한 워크스페이스와 컬렉션은 손상된 파일에 남아 있으며, 같은 폴더에 config.json.corrupt-<날짜>로 저장해 두었습니다.",
-  "config.unreadable":
-    "설정 파일(config.json)을 읽을 수 없어 기본 설정으로 실행 중입니다",
+  "config.unreadable": "설정을 읽을 수 없어 기본 설정으로 실행 중입니다",
   "config.unreadableDesc":
-    "파일은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 Meguri를 다시 시작하세요.",
+    "설정은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
@@ -138,6 +207,30 @@ export const ko: Record<TranslationKey, string> = {
   "about.license": "라이선스",
   "about.source": "소스",
   "about.fullDependencies": "모든 의존성 보기 (package.json)",
+  "crash.crashed": "{app}이(가) 지난번에 비정상 종료되었습니다",
+  "crash.uncleanExit": "{app}이(가) 지난번에 정상적으로 종료되지 않았습니다",
+  "crash.noticeDesc":
+    "보고서를 확인하고, 원하면 GitHub에 보고해 주세요. 자동으로 전송되지 않습니다.",
+  "crash.viewReport": "보고서 보기",
+  "crash.dismiss": "닫기",
+  "crash.reportTitle": "충돌 보고서",
+  "crash.reportDesc":
+    "공유하기 전에 내용을 확인하세요. 'GitHub에 보고'는 보고서를 복사한 뒤 새 이슈 작성 화면을 엽니다. 복사한 보고서를 붙여 넣으세요.",
+  "crash.copy": "복사",
+  "crash.copied": "보고서를 복사했습니다",
+  "crash.copyFailed": "보고서를 복사할 수 없습니다",
+  "crash.reportOnGitHub": "GitHub에 보고",
+  "crash.title": "충돌 보고서",
+  "crash.desc":
+    "최근 비정상 종료된 실행의 보고서를 보관합니다. 이 컴퓨터에만 저장되며 자동으로 전송되지 않습니다.",
+  "crash.none": "충돌 보고서가 없습니다.",
+  "crash.openFolder": "폴더 열기",
+  "crash.openFolderFailed": "폴더를 열 수 없습니다",
+  "crash.view": "보기",
+  "crash.delete": "삭제",
+  "crash.deleteFailed": "보고서를 삭제할 수 없습니다",
+  "crash.kindCrashed": "비정상 종료",
+  "crash.kindUncleanExit": "정상 종료되지 않음",
   "keybinding.normal": "표준",
   "keybinding.vim": "Vim",
   "keybinding.emacs": "Emacs",
@@ -145,6 +238,7 @@ export const ko: Record<TranslationKey, string> = {
   // home
   "home.noDirectory": "(디렉터리 미선택)",
   "home.scan": "스캔",
+  "home.moreTools": "더 보기",
   "home.initError": "초기화 오류: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "데이터베이스 형식이 현재 앱 버전과 일치하지 않을 수 있습니다. 왼쪽 사이드바에서 이 워크스페이스를 삭제한 후 다시 등록해 주세요.",
@@ -165,26 +259,29 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanCanceled": "스캔을 취소했습니다",
   "home.escCloseHint": "Esc 키를 한 번 더 누르면 창이 닫힙니다",
   "home.scanError": "스캔 중 오류가 발생했습니다",
+  "home.scanExclusionStuck":
+    "스캔 제외 패턴을 실행하는 데 시간이 너무 오래 걸렸습니다",
+  "home.scanExclusionStuckDesc":
+    "스캔하지 않았습니다. 설정 → 스캔에서 패턴을 수정하거나 삭제하세요.",
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":
-    "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, Meguri가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
+    "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, {app}가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
   "home.scanSkipped": "읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다",
   "home.scanSkippedNamed":
     '"{name}"에서 읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다',
   "home.scanSkippedDesc":
-    "Meguri에 읽기 권한이 없거나 다른 프로그램이 사용 중일 수 있습니다. 파일 목록의 해당 부분은 그대로 두었으며, 다음 스캔에서 다시 시도합니다.",
+    "{app}에 읽기 권한이 없거나 다른 프로그램이 사용 중일 수 있습니다. 파일 목록의 해당 부분은 그대로 두었으며, 다음 스캔에서 다시 시도합니다.",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
 
   // command menu
   "command.title": "명령 메뉴",
-  "command.placeholder": "명령 검색...",
+  "command.placeholder": "파일 검색 또는 명령 입력...",
   "command.empty": "일치하는 명령이 없습니다.",
   "command.groupNavigation": "이동",
   "command.groupWorkspace": "워크스페이스",
   "command.groupView": "보기",
-  "command.focusSearch": "검색에 포커스",
   "command.openDevTools": "개발자 콘솔 열기",
   "command.shortcutHint": "{shortcut} 로 열기",
   "command.groupFile": "파일",
@@ -201,6 +298,13 @@ export const ko: Record<TranslationKey, string> = {
   "command.pageCollections": "컬렉션",
   "command.ratingPlaceholder": "0~5를 입력해 선택...",
   "command.collectionPlaceholder": "컬렉션 검색...",
+  "command.workspacePlaceholder": "전환할 워크스페이스 검색...",
+  "command.collectionOpenPlaceholder": "열 컬렉션 검색...",
+  "command.searchInPlaceholder":
+    "{name}에서 검색할 내용을 입력 (Enter만 누르면 열기)",
+  "command.openItem": "{name} 열기",
+  "command.searchIn": "{name}에서 “{q}” 검색",
+  "command.clearFilters": "모든 필터 지우기",
   "command.groupRecent": "최근 검색",
   "command.clearRecent": "최근 검색 지우기",
   "command.more": "{count}개 더 · 입력해서 좁히기",
@@ -209,10 +313,12 @@ export const ko: Record<TranslationKey, string> = {
   // filter
   "filter.searchHint":
     '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다. note:pexels 로 메모에 그 글자가 들어 있는 파일을, has:note 로 메모가 있는 파일을 필터링합니다.',
+  "filter.hasNote": "메모 있음",
+  "filter.openSearch": "검색하거나 명령 실행",
+  "filter.clearSearch": "검색 지우기",
   "filter.searchPlaceholder": "파일 이름·태그 검색",
   "filter.tagSuggestions": "태그 제안",
   "filter.tagElsewhere": "다른 워크스페이스에만 있음",
-  "filter.hasNote": "메모 있음",
   "filter.all": "전체",
   "filter.played": "시청함",
   "filter.unplayed": "미시청",
@@ -227,10 +333,19 @@ export const ko: Record<TranslationKey, string> = {
   "filter.dateTo": "종료일",
   "filter.more": "기타 조건",
   "filter.moreActive": "기타 조건 ({count}개 적용 중)",
+  "filter.hashChip": "콘텐츠 해시",
+  "filter.extChip": "확장자",
+  "filter.sizeChip": "크기",
+  "filter.durationChip": "길이",
+  "filter.widthChip": "너비",
+  "filter.heightChip": "높이",
+  "filter.excludeChip": "제외",
   "filter.kindFilter": "종류로 필터링",
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",
   "filter.otherSection": "기타",
+  "filter.subtitles": "자막이 있는 동영상만 표시",
+  "filter.subtitlesChip": "자막 있음",
 
   // smart collections
   "smartCollection.title": "스마트 컬렉션",
@@ -247,6 +362,18 @@ export const ko: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "파일을 찾을 수 없습니다.",
+  "downloadOrigin.title": "다운로드 출처",
+  "downloadOrigin.website": "웹사이트",
+  "downloadOrigin.recorded": "기록된 URL",
+  "downloadOrigin.download": "다운로드 URL",
+  "downloadOrigin.referrer": "참조 페이지 URL",
+  "downloadOrigin.other": "기타 기록된 URL",
+  "downloadOrigin.copy": "복사",
+  "downloadOrigin.copyLabel": "{label} 복사",
+  "downloadOrigin.openLabel": "{label} 열기",
+  "downloadOrigin.copied": "URL을 클립보드에 복사했습니다",
+  "downloadOrigin.copyFailed": "URL을 복사할 수 없습니다.",
+  "downloadOrigin.openFailed": "URL을 열 수 없습니다.",
   "media.openExternal": "외부에서 열기",
   "media.openExternalFailed": "외부 앱에서 열 수 없습니다",
   "fileMenu.open": "열기",
@@ -274,12 +401,15 @@ export const ko: Record<TranslationKey, string> = {
   "media.moreActions": "기타 작업",
   "media.prev": "이전 파일",
   "media.next": "다음 파일",
+  "media.zoomIn": "확대",
+  "media.zoomOut": "축소",
+  "media.zoomFit": "화면에 맞추기",
   "shortcuts.title": "키보드 단축키",
   "shortcuts.sectionList": "목록",
-  "shortcuts.sectionDetail": "상세·플레이어",
+  "shortcuts.sectionDetail": "상세",
   "shortcuts.commandMenu":
     "명령 메뉴 열기 (파일 작업, 최근 검색, 스마트 컬렉션)",
-  "shortcuts.search": "검색에 포커스",
+  "shortcuts.search": "검색",
   "shortcuts.scrollDown": "아래로 스크롤",
   "shortcuts.scrollUp": "위로 스크롤",
   "shortcuts.moveFocus": "포커스 이동(상하좌우)",
@@ -299,10 +429,46 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.skip10": "10초 뒤로 / 앞으로",
   "shortcuts.volume": "볼륨 올리기 / 내리기",
   "shortcuts.mute": "음소거 전환",
+  "shortcuts.speed": "느리게 / 빠르게",
   "shortcuts.fullscreen": "전체 화면 전환",
   "shortcuts.seekStart": "처음으로 이동",
   "shortcuts.spectrumPattern":
     "스펙트럼 패턴 다음 / 이전 (플레이리스트 재생의 오디오)",
+  "shortcuts.sectionGeneral": "일반",
+  "shortcuts.sectionPlayback": "재생",
+  "shortcuts.sectionPlayer": "플레이어",
+  "shortcuts.sectionDiscover": "디스커버",
+  "shortcuts.hintGeneral": "모든 화면",
+  "shortcuts.hintList": "라이브러리",
+  "shortcuts.hintDetail": "파일을 연 상태",
+  "shortcuts.hintPlayback": "동영상과 오디오",
+  "shortcuts.hintPlayer": "플레이리스트",
+  "shortcuts.hintDiscover": "카드 셔플",
+  "shortcuts.zoom": "확대 / 축소",
+  "shortcuts.zoomReset": "배율 초기화",
+  "shortcuts.imagePaging": "이전 / 다음 파일 (이미지)",
+  "shortcuts.imageZoom": "이미지·동영상 확대 / 축소 (포인터 위치)",
+  "shortcuts.imageZoomToggle": "이미지를 화면에 맞추기 / 실제 크기",
+  "shortcuts.wheel": "휠",
+  "shortcuts.doubleClick": "더블클릭",
+  "shortcuts.playerPrevNext": "이전 / 다음",
+  "shortcuts.playerArrows": "이전 / 다음 (이미지와 오디오)",
+  "shortcuts.shuffle": "셔플 전환",
+  "shortcuts.playerDetail": "재생 중인 파일의 상세 열기",
+  "shortcuts.playerExit": "플레이어 닫기",
+  "shortcuts.discoverPaging": "이전 / 다음 카드",
+  "shortcuts.discoverReshuffle": "다시 섞기",
+  "shortcuts.preset": "프리셋",
+  "shortcuts.presetNote": "점이 표시된 키는 프리셋을 따릅니다.",
+  "shortcuts.presetChange": "설정에서 변경",
+  "shortcuts.filterLabel": "단축키 필터",
+  "shortcuts.filterPlaceholder": "동작이나 키로 필터",
+  "shortcuts.noMatch": "“{query}”와 일치하는 단축키가 없습니다",
+  "shortcuts.noMatchHint": "동작(“볼륨”)이나 키(“ctrl”)로 찾아 보세요.",
+  "shortcuts.sectionsLabel": "섹션",
+  "shortcuts.or": "또는",
+  "shortcuts.toClose": "로 닫기",
+  "shortcuts.macNote": "macOS에서는 Ctrl이 ⌘입니다.",
   "media.rating": "평가",
   "media.tags": "태그",
   "media.note": "메모",
@@ -343,6 +509,12 @@ export const ko: Record<TranslationKey, string> = {
   "media.metaDuration": "길이",
   "media.metaCodec": "코덱",
   "media.metaFps": "FPS",
+  "media.metaSampleRate": "샘플링 레이트",
+  "media.metaBitDepth": "비트 심도",
+  "media.metaChannels": "채널",
+  "media.metaBpm": "BPM",
+  "media.metaKey": "키",
+  "media.metaGenre": "장르",
   "media.playHistory": "재생 기록",
   "media.scenes": "장면",
   "media.bookmarks": "장면 북마크",
@@ -353,6 +525,37 @@ export const ko: Record<TranslationKey, string> = {
   "media.currentMainThumb": "현재 메인 썸네일:",
 
   // player controls
+  "grade.cool": "차가움",
+  "grade.warm": "따뜻함",
+  "grade.green": "녹색",
+  "grade.magenta": "마젠타",
+  "grade.title": "영상 조정",
+  "grade.color": "색상",
+  "grade.exposure": "노출",
+  "grade.contrast": "대비",
+  "grade.pivot": "피벗",
+  "grade.saturation": "감산 채도",
+  "grade.temperature": "색온도",
+  "grade.tint": "색조",
+  "grade.toggle": "영상 조정 사용",
+  "grade.on": "켜짐",
+  "grade.off": "꺼짐",
+  "grade.resetAll": "모두 초기화",
+  "grade.holdHint": "조정 이름을 길게 누르면 중립값으로 미리 볼 수 있습니다.",
+  "grade.preview": "선형 sRGB 미리보기",
+  "grade.unavailable": "이 기기에서는 영상 조정을 사용할 수 없습니다.",
+
+  "player.subtitles": "자막",
+  "player.subtitleAuto": "오디오 언어와 일치",
+  "player.subtitleOff": "끄기",
+  "player.subtitleResetPosition": "위치 초기화",
+  "player.subtitleLoading": "자막 불러오는 중…",
+  "player.subtitleUnavailable": "이 자막 트랙을 불러올 수 없습니다.",
+  "player.subtitleTrackNumber": "트랙 {number}",
+  "player.audioSubtitles": "오디오 및 자막",
+  "player.subtitleAutoMatch": "{audio} 오디오일 때 {track} 선택",
+  "player.subtitleAutoNone": "일치하는 자막 없음(끄기)",
+  "player.subtitleAutoUnknown": "오디오 언어 알 수 없음(끄기)",
   "player.play": "재생",
   "player.playKey": "재생 (Space)",
   "player.pauseKey": "일시정지 (Space)",
@@ -362,6 +565,13 @@ export const ko: Record<TranslationKey, string> = {
   "player.unmute": "음소거 해제 (M)",
   "player.fullscreen": "전체화면 (F)",
   "player.volume": "음량",
+  "player.speed": "재생 속도",
+  "player.speedValue": "{speed}×",
+  "player.audioTrack": "오디오 트랙",
+  "player.audioTrackNumber": "트랙 {number}",
+  "player.audioTrackDefault": "기본값",
+  "player.audioTrackUnavailable":
+    "이 오디오 트랙을 재생할 수 없어 이전 트랙으로 돌아갔습니다.",
   "player.seek": "탐색",
   "player.playFailed": "내장 플레이어로 재생할 수 없습니다.",
   "player.openExternal": "외부 플레이어로 열기",
@@ -375,6 +585,8 @@ export const ko: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "로드가 중단되었습니다 (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "네트워크 오류 (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "영상을 디코딩하지 못했습니다 — 이 환경에서 코덱 미지원 가능성",
   "player.errDecode":
     "디코딩에 실패했습니다 — 코덱 미지원 가능성 (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":
@@ -424,6 +636,8 @@ export const ko: Record<TranslationKey, string> = {
   "select.deselectAll": "비우기",
   "select.editTags": "태그 편집",
   "select.exit": "선택 모드 종료",
+  "select.compare": "비교",
+  "select.compareHint": "이미지를 정확히 두 장 선택하면 비교할 수 있습니다",
   "select.bulkFileLimit":
     "한 번에 편집할 수 있는 파일은 {max}개까지입니다. 선택을 줄이세요.",
   "select.ratingClear": "별점 지우기",
@@ -462,7 +676,7 @@ export const ko: Record<TranslationKey, string> = {
   // media grid
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
-    "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
+    "「스캔」을 실행하면 하위의 동영상·이미지·오디오가 여기에 표시됩니다.",
   "grid.searchByTag": "「{name}」(으)로 필터링",
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
@@ -488,6 +702,13 @@ export const ko: Record<TranslationKey, string> = {
   "heatmap.clearDay": "선택한 날짜 해제",
   "heatmap.error": "집계를 불러오지 못했습니다",
 
+  // Filmstrip view
+  "view.filmstrip": "필름스트립 보기",
+  "view.folderUnavailableFilmstrip":
+    "필름스트립 보기에서는 폴더별 보기를 사용할 수 없습니다",
+  "filmstrip.bookmarks": "북마크: {count}",
+  "filmstrip.playFrom": "{time}부터 재생",
+  "filmstrip.waveform": "파형: 클릭한 위치부터 재생",
   // 타임라인 보기
   "view.timeline": "타임라인 보기",
   "view.folderUnavailableTimeline":
@@ -578,6 +799,19 @@ export const ko: Record<TranslationKey, string> = {
   "folder.moved": "보고 있던 폴더를 찾을 수 없어 상위 폴더로 이동했습니다",
   "folder.chip": "폴더",
   "folder.showInLibrary": "라이브러리에서 폴더 보기",
+  "folder.excludeFromScans": "스캔에서 제외",
+  "folder.excludeConfirm": "이 폴더를 이 워크스페이스의 스캔에서 제외합니다.",
+  "folder.excludeAction": "제외",
+  "folder.excluded": "“{name}”을(를) 스캔에서 제외했습니다",
+  "folder.excludeTitle": "“{name}”을(를) 스캔에서 제외",
+  "folder.excludeTarget": "대상 폴더",
+  "folder.excludeHides":
+    "안에 있는 파일 {count}개가 바로 숨겨집니다. 디스크의 파일은 삭제되지 않습니다.",
+  "folder.excludeOnlyThis":
+    "이 폴더만 제외됩니다. 다른 위치에 있는 “{name}” 폴더는 계속 스캔합니다.",
+  "folder.excludeUndoHint":
+    "다시 포함하려면 워크스페이스 편집의 “스캔에서 제외”에서 할 수 있습니다.",
+  "folder.excludeFailed": "폴더를 제외하지 못했습니다",
   "folder.showFailed": "폴더를 표시할 수 없습니다",
   "folder.subfolderMenu": '"{name}"의 하위 폴더',
   "folder.loading": "불러오는 중…",
@@ -599,15 +833,19 @@ export const ko: Record<TranslationKey, string> = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "“{path}” 안에서 고르는 중",
   "discover.empty": "추천할 미디어가 없습니다.",
+  "discover.loadFailed":
+    "추천할 미디어를 불러오지 못했습니다. 다시 시도해 주세요.",
   "discover.emptyHint":
-    "「스캔」으로 동영상과 이미지를 가져오면 여기에서 무작위로 추천됩니다.",
-  "discover.sceneHint": "마우스를 올리면 확대 · 클릭하면 해당 지점부터 재생",
+    "「스캔」으로 동영상, 이미지, 오디오를 가져오면 여기에서 무작위로 추천됩니다.",
+  "discover.sceneHint": "장면을 클릭하면 해당 위치로 이동합니다",
   "discover.moreScenes": "+{count}",
 
   // 재생 기록
   "history.title": "재생 기록",
   "history.empty": "재생 기록이 아직 없습니다.",
-  "history.emptyHint": "동영상이나 이미지를 재생하면 여기에 기록이 표시됩니다.",
+  "history.loadFailed": "재생 기록을 불러오지 못했습니다. 다시 시도해 주세요.",
+  "history.emptyHint":
+    "동영상이나 이미지, 오디오를 재생하면 여기에 기록이 표시됩니다.",
   "history.clear": "기록 지우기",
   "history.clearAction": "지우기",
   "history.clearConfirm":
@@ -618,6 +856,27 @@ export const ko: Record<TranslationKey, string> = {
   "history.today": "오늘",
   "history.yesterday": "어제",
 
+  // Missing files
+  "missing.title": "찾을 수 없는 파일",
+  "missing.empty": "찾을 수 없는 파일이 없습니다.",
+  "missing.loadFailed":
+    "찾을 수 없는 파일을 확인하지 못했습니다. 다시 시도해 주세요.",
+  "missing.hint":
+    "스캔에서 디스크에 없던 파일입니다. 파일이 돌아오면 컬렉션 등은 그대로 복원됩니다. 다시 돌아오지 않을 파일만 선택해서 삭제하세요.",
+  "missing.scanning":
+    "스캔 중인 워크스페이스는 스캔이 끝날 때까지 표시되지 않습니다.",
+  "missing.truncated":
+    "전체 {total}개 중 최근에 없어진 {shown}개를 표시합니다. 삭제하면 나머지가 표시됩니다.",
+  "missing.selectAll": "모두 선택",
+  "missing.goneAt": "{date}부터 없음",
+  "missing.remove": "찾을 수 없는 파일 삭제",
+  "missing.removeSelected": "선택한 {count}개 삭제",
+  "missing.removeConfirm":
+    "선택한 {count}개 파일을 파일 목록과 컬렉션에서 삭제하고 썸네일도 지울까요? 태그, 평점 등 메타데이터는 유지됩니다. 이 작업은 되돌릴 수 없습니다.",
+  "missing.removeAction": "삭제",
+  "missing.removedToast": "{count}개 파일을 삭제했습니다",
+  "missing.removeFailed": "파일을 삭제할 수 없습니다",
+
   "duplicates.title": "중복 파일",
   "duplicates.empty": "중복 파일을 찾을 수 없습니다.",
   "duplicates.emptyHint":
@@ -625,6 +884,10 @@ export const ko: Record<TranslationKey, string> = {
   "duplicates.loadFailed":
     "중복 파일을 불러오지 못했습니다. 다시 시도해 주세요.",
   "duplicates.retry": "다시 시도",
+  "duplicates.copyHash": "해시 복사",
+  "duplicates.hashCopied": "해시를 복사했습니다",
+  "duplicates.hashCopyFailed": "해시를 복사할 수 없습니다",
+  "duplicates.showInList": "목록에서 보기",
   "duplicates.fileCount": "{count}개",
   "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
   "duplicates.filter": "중복 파일만 표시",
@@ -855,6 +1118,7 @@ export const ko: Record<TranslationKey, string> = {
   "tags.cloudOnlyAuto":
     "표시할 수 있는 것은 자동 태그뿐입니다. 자동 태그를 켜면 표시됩니다.",
   "tags.empty": "아직 태그가 없습니다.",
+  "tags.loadFailed": "태그를 불러오지 못했습니다. 다시 시도해 주세요.",
   "tags.emptyHint": "상세 화면에서 태그를 추가하면 여기에 표시됩니다.",
   "tags.searchPlaceholder": "태그 검색",
   "tags.noMatch": "일치하는 태그가 없습니다.",
@@ -902,12 +1166,28 @@ export const ko: Record<TranslationKey, string> = {
   "tags.ns.dur": "길이",
   "tags.ns.codec": "코덱",
   "tags.ns.orient": "방향",
+  "tags.ns.quality": "음질",
+  "tags.ns.ch": "채널",
+  "tags.ns.tempo": "템포",
+  "tags.ns.bpm": "BPM",
+  "tags.ns.key": "키",
+  "tags.ns.camelot": "Camelot",
+  "tags.ns.genre": "장르",
   "tags.value.durShort": "짧음",
   "tags.value.durMedium": "보통",
   "tags.value.durLong": "긺",
   "tags.value.orientVertical": "세로",
   "tags.value.orientHorizontal": "가로",
   "tags.value.orientSquare": "정사각형",
+  "tags.value.qualityLossless": "무손실",
+  "tags.value.qualityLossy": "손실 압축",
+  "tags.value.qualityHires": "하이레조",
+  "tags.value.chMono": "모노",
+  "tags.value.chStereo": "스테레오",
+  "tags.value.chSurround": "서라운드",
+  "tags.value.tempoSlow": "느림",
+  "tags.value.tempoModerate": "보통",
+  "tags.value.tempoFast": "빠름",
 
   // workspace rail
   "workspace.all": "전체",
@@ -915,6 +1195,28 @@ export const ko: Record<TranslationKey, string> = {
   "workspace.edit": "워크스페이스 편집",
   "workspace.editAction": "저장",
   "workspace.pathReadonly": "경로는 변경할 수 없습니다.",
+  "workspace.excludedFolders": "스캔에서 제외",
+  "workspace.excludedFoldersEmpty":
+    "제외한 폴더가 없습니다. 폴더 보기에서 폴더를 마우스 오른쪽 버튼으로 클릭하거나 “폴더 추가”를 사용하세요.",
+  "workspace.excludedFolderNotFound": "찾을 수 없음",
+  "workspace.excludedFolderInclude": "{path}을(를) 다시 스캔에 포함",
+  "workspace.excludedFoldersNextScan":
+    "목록에서 뺀 폴더는 다음 스캔부터 다시 스캔합니다.",
+  "workspace.excludedFoldersDesc":
+    "이 폴더와 그 안의 항목만 제외됩니다. 다른 위치에 있는 같은 이름의 폴더는 계속 스캔합니다.",
+  "workspace.excludedFolderIncludeAction": "다시 포함",
+  "workspace.excludedFolderRemoveAction": "목록에서 제거",
+  "workspace.excludedFolderRemove": "{path}을(를) 목록에서 제거",
+  "workspace.excludedFolderUndo": "취소",
+  "workspace.excludedFolderUndoLabel": "{path}의 변경 취소",
+  "workspace.excludedFolderIncluding": "저장하면 다시 포함됩니다",
+  "workspace.excludedFolderAdding": "저장하면 제외됩니다",
+  "workspace.excludedFoldersAdd": "폴더 추가",
+  "workspace.excludedFolderOutside": "워크스페이스 안에 있는 폴더를 선택하세요",
+  "workspace.excludedFolderPickFailed": "폴더 선택 창을 열지 못했습니다",
+  "workspace.excludedFoldersRetry": "다시 시도",
+  "workspace.excludedFoldersLoadError": "제외한 폴더를 읽지 못했습니다.",
+  "workspace.excludedFoldersSaveError": "제외한 폴더를 업데이트하지 못했습니다",
   "workspace.addDirectory": "동영상 디렉터리 추가",
   "workspace.removeFromSidebar": "워크스페이스 삭제",
   "workspace.removeTitle": "워크스페이스 삭제",
@@ -1025,7 +1327,7 @@ export const ko: Record<TranslationKey, string> = {
   "playlist.loading": "불러오는 중…",
   "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
   "playlist.emptyHint":
-    "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
+    "동영상이나 이미지, 오디오가 있는 목록을 연 뒤 재생을 시작하세요.",
   "playlist.unplayable": "재생할 수 있는 항목이 없었습니다.",
   "playlist.reorderNeedsManual": "순서를 바꾸려면 수동 순서로 전환하세요.",
   "settings.resumePlayback": "이어서 재생",
@@ -1095,18 +1397,18 @@ export const ko: Record<TranslationKey, string> = {
   "tour.languageTitle": "언어를 골라 줘",
   "tour.languageBody":
     "사용할 언어를 골라 줘. 이 안내도 그 언어로 진행할게. 나중에 설정에서 바꿀 수도 있어",
-  "tour.welcomeTitle": "Meguri에 오신 걸 환영해",
+  "tour.welcomeTitle": "{app}에 오신 걸 환영해",
   "tour.welcomeBody":
     "사용법을 간단히 안내할게. Esc를 누르면 언제든 건너뛸 수 있어",
   "tour.addWorkspaceTitle": "폴더 추가",
   "tour.addWorkspaceBody":
-    "먼저 동영상이나 이미지가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
+    "먼저 동영상이나 이미지, 오디오가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
   "tour.collectionsTitle": "컬렉션",
   "tour.collectionsBody":
     "여러 폴더의 파일을 하나의 컬렉션으로 모을 수 있어. 파일을 여기로 끌어 오면 추가돼",
   "tour.searchTitle": "검색과 필터",
   "tour.searchBody":
-    "파일 이름이나 태그로 검색할 수 있어. 목록에서 / 를 누르면 여기로 와",
+    "파일 이름이나 태그로 검색할 수 있어. 여기를 클릭하거나 목록에서 / 를 누르고, 열린 메뉴에 입력해",
   "tour.viewTitle": "보기 전환",
   "tour.viewBody": "그리드, 목록, 타임라인, 그래프로 보기를 바꿀 수 있어",
   "tour.discoverTitle": "디스커버리",
@@ -1131,4 +1433,31 @@ export const ko: Record<TranslationKey, string> = {
   "settings.tour": "튜토리얼",
   "settings.tourDesc": "처음 실행할 때 나오는 사용법 안내를 다시 표시합니다",
   "settings.tourReplay": "다시 보기",
+
+  // image comparison
+  "compare.title": "이미지 비교",
+  "compare.mode": "비교 방식",
+  "compare.mode.slider": "슬라이더",
+  "compare.mode.difference": "차이",
+  "compare.mode.onion": "겹쳐 보기",
+  "compare.mode.blink": "깜빡임",
+  "compare.opacity": "B의 불투명도",
+  "compare.swap": "A와 B 바꾸기",
+  "compare.align": "위치 맞춤",
+  "compare.alignHint": "찾은 어긋남만큼 B를 옮겨 두 이미지를 맞춥니다",
+  "compare.zoomIn": "확대",
+  "compare.zoomOut": "축소",
+  "compare.fit": "전체 보기",
+  "compare.split": "경계 위치",
+  "compare.aligning": "위치 맞추는 중… {percent}%",
+  "compare.alignFailed": "위치를 맞추지 못했습니다",
+  "compare.alignResult": "어긋남 {dx}, {dy} px · 윤곽 일치도 {score}%",
+  "compare.alignScale": "배율 ×{scale}",
+  "compare.lowScore": "윤곽 일치도가 낮아 위치가 어긋났을 수 있습니다",
+  "shortcuts.sectionCompare": "이미지 비교",
+  "shortcuts.compareModes": "슬라이더 / 차이 / 겹쳐 보기 / 깜빡임",
+  "shortcuts.compareSwap": "A와 B 바꾸기",
+  "shortcuts.compareZoom": "이미지 확대 / 축소",
+  "shortcuts.compareFit": "이미지 전체 보기",
+  "shortcuts.compareBlink": "깜빡임 중 A와 B 전환",
 };

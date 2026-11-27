@@ -15,6 +15,7 @@ const { openDb, usesOwnMetadata } = await import("../db.js");
 const paths = await import("../paths.js");
 const { LEGACY_METADATA_DDL } = await import("./helpers.js");
 const { backupLibraryNow } = await import("../libraryBackup.js");
+const { loadConfig, saveConfig } = await import("../appConfig.js");
 
 let roots: string[] = [];
 
@@ -50,6 +51,18 @@ function register(rootPaths: string[]): void {
   const ws = new Workspaces();
   for (const root of rootPaths) ws.add(root);
   ws.closeAll();
+}
+
+/**
+ * The library as if put back from a copy older than the merge: no record of
+ * it and no metadata, but the settings (taken after they moved there).
+ */
+function loseLibraryButSettings(): void {
+  const settings = loadConfig();
+  for (const suffix of ["", "-wal", "-shm"]) {
+    fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
+  }
+  saveConfig(settings);
 }
 
 const backupOf = (root: string) =>
@@ -128,9 +141,7 @@ describe("merging workspaces into the library at startup", () => {
       recursive: true,
       force: true,
     });
-    for (const suffix of ["", "-wal", "-shm"]) {
-      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
-    }
+    loseLibraryButSettings();
 
     const ws = new Workspaces();
     ws.bootstrap(null);
@@ -348,9 +359,7 @@ describe("merging workspaces into the library at startup", () => {
     expect(first.mergedInLastRun()).toBe(1);
     first.closeAll();
     // Put back from a copy older than the merge: no record, no metadata.
-    for (const suffix of ["", "-wal", "-shm"]) {
-      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
-    }
+    loseLibraryButSettings();
     const beforeRemerge = Date.now() - 1000;
     fs.utimesSync(
       backupOf(a),
@@ -410,9 +419,7 @@ describe("merging workspaces into the library at startup", () => {
     first.bootstrap(null);
     await first.mergePending(() => {});
     first.closeAll();
-    for (const suffix of ["", "-wal", "-shm"]) {
-      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
-    }
+    loseLibraryButSettings();
     // a's backup cannot be read.
     fs.writeFileSync(backupOf(a), "not a database ".repeat(500));
 

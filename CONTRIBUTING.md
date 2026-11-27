@@ -37,7 +37,139 @@ If you're not sure whether your change counts as larger, starting a discussion
 or opening an issue is always welcome. Issues labelled
 [`good first issue`](https://github.com/zabuton-app/meguri/labels/good%20first%20issue)
 are a good place to start if you'd like to help but don't have a change in
-mind yet.
+mind yet. See [Labels](#labels) for what each label means.
+
+## Network access
+
+Meguri works offline, and that is one of its defining traits (see
+[Privacy](README.md#privacy)). A feature that needs the network is not ruled
+out, but it has to meet all of the following. Please check an idea against
+them before you propose or build it.
+
+- **No user data leaves the machine.** File names, paths, tags, search
+  queries, playback history and anything derived from them are never sent.
+- **Off until the user turns it on.** The feature makes no request until the
+  user enables it, and the setting says what is sent and where.
+- **The renderer stays off the network.** Requests are made by the main
+  process. The renderer's Content Security Policy in
+  [index.html](index.html) limits `connect-src` to the app itself and the
+  local media server on `127.0.0.1`; do not widen it.
+- **A response is untrusted input.** In an Electron app, a single XSS in the
+  renderer can reach the IPC that reads and edits local files. Validate what
+  comes back before it reaches the renderer or the database, and describe
+  this threat model in the issue. It has to be maintained for as long as the
+  feature exists, not just designed once.
+- **An offline alternative comes first.** When a local approach meets the
+  same need, such as reading a sidecar file next to the media instead of
+  querying an online service, use it.
+
+Opening a link in the user's browser, such as **Report on GitHub** in the crash
+report dialog, is not a request made by Meguri and is outside these rules.
+
+### The update check
+
+The update check is the one named exception to "off until the user turns it
+on". It is on by default so that users learn about new releases, including
+security fixes, without having to look. It sends nothing but the app name and
+version, and it can be turned off in **Settings → App → Updates**. The
+[Privacy](README.md#privacy) section describes exactly what it does.
+
+The exception covers the update check only. A new feature does not become on
+by default by pointing at it.
+
+## Labels
+
+Issues and pull requests are labelled along a few independent axes. An issue
+usually has one type label, one or two `area:` labels, a `feature:` label when
+it belongs to a feature tracked across several issues, and a `status:` label
+when something has to happen before the work can start. A pull request under
+review has a `status:` label that says whose turn it is. Even the labels whose
+meaning seems obvious are listed here, so everyone reads them the same way.
+
+### Type
+
+- `bug`: something does not work as intended.
+- `enhancement`: a new feature, or an improvement to an existing one.
+- `documentation`: a change to the README or `docs/` only.
+- `question`: a question rather than a change; more information is requested.
+
+### Area
+
+Where in the code the change lands. These follow the directory layout, so the
+label tells you where to start reading.
+
+- `area: ui`: renderer views and components under `src/`, themes,
+  accessibility.
+- `area: player`: playback UI and behaviour: the video player, the Player
+  route, audio.
+- `area: scan`: scanning, folder watching and move detection (`scan.ts`,
+  `scanManager.ts`).
+- `area: db`: schema, queries, the query worker, full-text search, the
+  cross-workspace (`All`) merge.
+- `area: media-server`: the local media server (`server.ts`), ffmpeg remux and
+  transcode, thumbnail serving.
+- `area: ipc`: the IPC boundary: `shared/ipc`, the preload script, the
+  renderer IPC client.
+- `area: app`: main-process foundation: config, tray, updater, CSP,
+  permissions.
+- `area: i18n`: the translation mechanism and the locale files.
+- `area: tests`: test infrastructure and E2E tests.
+- `area: ci`: GitHub workflows, builds, releases, store submission.
+- `area: deps`: dependency updates.
+
+### Feature
+
+A user-facing feature whose work spans several areas. Add it alongside the
+`area:` labels, so all the issues about one feature can be found together.
+
+- `feature: subtitles`: embedded subtitles: track selection, extraction and
+  display.
+
+### Status
+
+What has to happen before the work can start. An issue without a `status:`
+label is ready to be worked on.
+
+- `status: needs repro`: found by reading the code and not yet reproduced in
+  the running app. Reproduce it first; if you can't, say so in the issue. A
+  fix should come with a test or reproduction steps.
+- `status: needs design`: the scope or design is not settled. Join the
+  discussion in the issue instead of sending a pull request.
+- `status: blocked`: waiting on another issue or pull request, named in the
+  issue.
+- `status: proposal`: a suggestion from a contributor, waiting for a
+  maintainer decision.
+- `on hold`: paused on purpose until there is demand or an external blocker is
+  resolved.
+
+On a pull request, the `status:` label says whose turn it is. It has one of
+these at a time, and a pull request nobody has reviewed yet has neither.
+
+- `status: in review`: a maintainer is reviewing it, or will review the
+  changes you pushed or the reply you gave. Nothing is needed from you.
+- `status: changes requested`: a maintainer has reviewed it and is waiting for
+  you to address the feedback, given in a review or in a comment. Push your
+  changes or reply, and it goes back to `status: in review`.
+
+### Other
+
+- `good first issue`: small and well scoped, with the files to change named in
+  the issue. A good place to start. Please leave a short comment when you pick
+  one up so two people don't work on the same issue; there's no need to wait
+  for a reply before you start. If an issue was claimed but has seen no
+  activity for two weeks, feel free to take it over.
+- `help wanted`: the maintainers would welcome help with this one.
+- `performance`: about speed, memory or resource use. Can be combined with any
+  area.
+- `dependencies`: added by Dependabot to its dependency update pull requests.
+- `javascript`: added by Dependabot to pull requests that update JavaScript
+  packages.
+- `duplicate`: the same issue or pull request already exists; the original is
+  linked.
+- `invalid`: not a valid report or change, for example a misunderstanding or a
+  change unrelated to Meguri.
+- `wontfix`: understood, but will not be worked on, with the reason given in
+  the issue.
 
 ## Branching model
 
@@ -121,8 +253,10 @@ upstream ships a release that accepts React 19.
 Before opening a pull request, run the same checks CI runs:
 
 ```bash
-npm run typecheck  # type-check both src and electron
-npm test           # run the test suites (core, then renderer)
+npm run typecheck     # type-check both src and electron
+npm test              # run the test suites (core, then renderer)
+npm run lint          # ESLint
+npm run format:check  # Prettier (npm run format to fix)
 ```
 
 See [README.md](README.md) for the architecture overview, and

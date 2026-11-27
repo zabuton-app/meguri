@@ -21,13 +21,16 @@ import { type TranslationKey } from "@/i18n/locales/ja";
 import {
   usePreferences,
   SCENE_COUNT_OPTIONS,
+  FILMSTRIP_FRAMES_OPTIONS,
   PLAYLIST_IMAGE_SECONDS_OPTIONS,
   FRAME_QUALITY_OPTIONS,
   isFrameQuality,
   type FrameQuality,
   EMOJI_STYLE_OPTIONS,
+  WINDOW_BUTTONS_OPTIONS,
   isEmojiStyle,
   type EmojiStyle,
+  type WindowButtons,
   LIST_THUMB_SIZE_OPTIONS,
   isListThumbSize,
   type ListThumbSize,
@@ -42,14 +45,17 @@ import {
   type KeybindingPreset,
 } from "@/settings/keybindings";
 import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
-import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
+import { useLogo, useLogoImages } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
 import { CssThemeSection } from "./CssThemeSection";
 import { ThemeSection } from "./ThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
+import { FolderExclusionsSection } from "./FolderExclusionsSection";
+import { ScanExclusionsSection } from "./ScanExclusionsSection";
 import { useTour } from "@/tour/TourProvider";
+import { useExtraSettingsSections } from "@/settings/extraSections";
 import {
   isSpectrumPattern,
   SPECTRUM_PATTERN_OPTIONS,
@@ -91,6 +97,12 @@ const SPECTRUM_PATTERN_LABELS: Record<SpectrumPattern, TranslationKey> = {
   barcode: "settings.audioSpectrumPatternBarcode",
 };
 
+const WINDOW_BUTTONS_LABELS: Record<WindowButtons, TranslationKey> = {
+  left: "settings.windowButtonsLeft",
+  right: "settings.windowButtonsRight",
+  none: "settings.windowButtonsNone",
+};
+
 const EMOJI_STYLE_LABELS: Record<EmojiStyle, TranslationKey> = {
   native: "settings.emojiStyleNative",
   twemoji: "settings.emojiStyleTwemoji",
@@ -116,25 +128,44 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
   enso: "logo.enso",
 };
 
-/** Tab ids. The tab bar's order comes from the `tabs` array below. */
-type TabId = "general" | "library" | "playback" | "audio" | "app";
+/**
+ * Tab ids. The tab bar's order comes from the `tabs` array below. An app's
+ * own sections (renderApp's `settingsSections`) follow under a prefix, so
+ * their ids cannot collide with Meguri's.
+ */
+type TabId =
+  | "general"
+  | "library"
+  | "scan"
+  | "playback"
+  | "audio"
+  | "app"
+  | `extra-${string}`;
 
 export default function Settings() {
   const { mode, setMode } = useTheme();
   const { lang, setLang, t } = useI18n();
+  const extraSections = useExtraSettingsSections();
   const tabs = useMemo<readonly SettingsTab<TabId>[]>(
     () => [
       { id: "general", label: t("settings.tabGeneral") },
       { id: "library", label: t("settings.tabLibrary") },
+      { id: "scan", label: t("settings.tabScan") },
       { id: "playback", label: t("settings.tabPlayback") },
       { id: "audio", label: t("settings.tabAudio") },
       { id: "app", label: t("settings.tabApp") },
+      ...extraSections.map((section) => ({
+        id: `extra-${section.id}` as const,
+        label: section.label(lang),
+      })),
     ],
-    [t],
+    [t, lang, extraSections],
   );
   const {
     sceneCount,
     setSceneCount,
+    filmstripFrames,
+    setFilmstripFrames,
     keybindingPreset,
     setKeybindingPreset,
     hideSupportLink,
@@ -163,6 +194,8 @@ export default function Settings() {
     setResumePlayback,
     emojiStyle,
     setEmojiStyle,
+    windowButtons,
+    setWindowButtons,
     petVisible,
     setPetVisible,
     petSize,
@@ -177,6 +210,7 @@ export default function Settings() {
   const onClose = useCallback(() => navigate("/"), [navigate]);
 
   const { logo, setLogo: selectLogo } = useLogo();
+  const logoImages = useLogoImages();
 
   return (
     <SettingsModal onClose={() => void onClose()}>
@@ -189,8 +223,8 @@ export default function Settings() {
         </span>
         <Button
           variant="ghost"
-          size="sm"
-          className="ml-auto h-7 px-2"
+          size="compact"
+          className="ml-auto"
           onClick={() => void onClose()}
           title={`${t("common.close")} (Esc)`}
         >
@@ -210,12 +244,12 @@ export default function Settings() {
           role="tabpanel"
           id={`settings-panel-${tab}`}
           aria-labelledby={`settings-tab-${tab}`}
-          className="mx-auto flex max-w-2xl flex-col gap-3"
+          className="mx-auto flex max-w-2xl flex-col"
         >
           {tab === "general" && (
             <>
               {/* Language switch */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.language")}
@@ -239,7 +273,7 @@ export default function Settings() {
               </section>
 
               {/* Keybinding preset (file paging keys) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.keybinding")}
@@ -268,7 +302,7 @@ export default function Settings() {
               </section>
 
               {/* Appearance switch */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.appearance")}
@@ -277,7 +311,7 @@ export default function Settings() {
                     {t("settings.appearanceDesc")}
                   </span>
                 </div>
-                <div className="flex overflow-hidden rounded-md border border-border">
+                <div className="flex overflow-hidden rounded-control border border-border">
                   <button
                     type="button"
                     onClick={() => setMode("light")}
@@ -307,6 +341,38 @@ export default function Settings() {
                 </div>
               </section>
 
+              {/* Which end of the title bar holds the window buttons, if any */}
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.windowButtons")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.windowButtonsDesc")}
+                  </span>
+                </div>
+                {/* shrink-0: the description wraps instead; overflow-hidden
+                    would otherwise let the group shrink and cut off "None". */}
+                <div className="flex shrink-0 overflow-hidden rounded-control border border-border">
+                  {WINDOW_BUTTONS_OPTIONS.map((side) => (
+                    <button
+                      key={side}
+                      type="button"
+                      aria-pressed={windowButtons === side}
+                      onClick={() => setWindowButtons(side)}
+                      className={
+                        "whitespace-nowrap px-3 py-1.5 text-sm transition " +
+                        (windowButtons === side
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-bg text-muted hover:text-fg")
+                      }
+                    >
+                      {t(WINDOW_BUTTONS_LABELS[side])}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
               <ThemeSection />
 
               {/* CSS theme file, then the user stylesheet (custom.css) on top */}
@@ -314,7 +380,7 @@ export default function Settings() {
               <CustomCssSection />
 
               {/* Emoji glyph style (applies to all emoji in the UI) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.emojiStyle")}
@@ -356,7 +422,7 @@ export default function Settings() {
               </section>
 
               {/* App logo (window, tray, and in-app icon) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.logo")}
@@ -365,7 +431,9 @@ export default function Settings() {
                     {t("settings.logoDesc")}
                   </span>
                 </div>
-                <div className="flex gap-2">
+                {/* shrink-0: Preflight's img max-width:100% lets a squeezed
+                    button narrow the preview while its height stays fixed. */}
+                <div className="flex shrink-0 gap-2">
                   {LOGO_IDS.map((id) => {
                     const active = logo === id;
                     return (
@@ -375,16 +443,16 @@ export default function Settings() {
                         aria-pressed={active}
                         onClick={() => selectLogo(id)}
                         className={
-                          "flex flex-col items-center gap-1.5 rounded-md border px-3 py-2 transition " +
+                          "flex flex-col items-center gap-1.5 rounded-card border px-3 py-2 transition " +
                           (active
                             ? "border-primary ring-1 ring-primary"
                             : "border-border hover:border-primary")
                         }
                       >
                         <img
-                          src={LOGO_SRC[id]}
+                          src={logoImages?.[id]}
                           alt=""
-                          className="size-12 rounded-md"
+                          className="size-12 rounded-item"
                           draggable={false}
                         />
                         <span
@@ -401,7 +469,7 @@ export default function Settings() {
               </section>
 
               {/* The zabuton pet: out in the window or put away */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.pet")}
@@ -417,7 +485,7 @@ export default function Settings() {
                 />
               </section>
 
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.petSize")}
@@ -451,7 +519,7 @@ export default function Settings() {
           {tab === "library" && (
             <>
               {/* Scene thumbnail count */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.scenes")}
@@ -477,8 +545,35 @@ export default function Settings() {
                 </Select>
               </section>
 
+              {/* Filmstrip frame count */}
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.filmstripFrames")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.filmstripFramesDesc")}
+                  </span>
+                </div>
+                <Select
+                  value={String(filmstripFrames)}
+                  onValueChange={(v) => setFilmstripFrames(Number(v))}
+                >
+                  <SelectTrigger className="min-w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FILMSTRIP_FRAMES_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </section>
+
               {/* Hover preview (scrub preview on video thumbnails) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.hoverPreview")}
@@ -494,7 +589,7 @@ export default function Settings() {
               </section>
 
               {/* Frame preview quality (hover scrub / scene rail JPEG size) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.frameQuality")}
@@ -523,7 +618,7 @@ export default function Settings() {
               </section>
 
               {/* Thumbnail width in the list view */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.listThumbSize")}
@@ -553,11 +648,18 @@ export default function Settings() {
             </>
           )}
 
+          {tab === "scan" && (
+            <>
+              <ScanExclusionsSection />
+              <FolderExclusionsSection />
+            </>
+          )}
+
           {tab === "playback" && (
             <>
               {/* Resume where a video or track was stopped (positions are
                   recorded either way; this only decides where playback starts). */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.resumePlayback")}
@@ -574,7 +676,7 @@ export default function Settings() {
               </section>
 
               {/* Playlist: image duration (also the pan/zoom duration) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.playlistImageSeconds")}
@@ -601,7 +703,7 @@ export default function Settings() {
               </section>
 
               {/* Playlist: image pan/zoom (the OS reduce-motion setting still wins) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.playlistImageMotion")}
@@ -618,7 +720,7 @@ export default function Settings() {
 
               {/* Playlist: switching effects. The two are independent — fade dims,
                   transition slides — and the OS reduce-motion setting overrides both. */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.playlistFade")}
@@ -633,7 +735,7 @@ export default function Settings() {
                 />
               </section>
 
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.playlistTransition")}
@@ -649,7 +751,7 @@ export default function Settings() {
               </section>
 
               {/* Playlist: playback order. Also toggled from the player itself. */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.playlistShuffle")}
@@ -670,7 +772,7 @@ export default function Settings() {
             <>
               {/* The live spectrum on the detail / peek / playlist stages
                   (the OS reduce-motion setting still wins) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.audioSpectrum")}
@@ -687,7 +789,7 @@ export default function Settings() {
               </section>
 
               {/* Which look the spectrum takes */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.audioSpectrumPattern")}
@@ -724,7 +826,7 @@ export default function Settings() {
           {tab === "app" && (
             <>
               {/* Replay the first-launch tour (it starts once the list is back) */}
-              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-bright-fg">
                     {t("settings.tour")}
@@ -750,7 +852,7 @@ export default function Settings() {
 
               {/* Support / donation link (dismissible; hidden permanently once closed) */}
               {!hideSupportLink && (
-                <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <section className="flex items-center justify-between gap-3 border-b border-border py-3">
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-bright-fg">
                       {t("settings.support")}
@@ -771,8 +873,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-7 px-2"
+                      size="compact"
                       onClick={() => setHideSupportLink(true)}
                       aria-label={t("settings.hideSupport")}
                       title={t("settings.hideSupport")}
@@ -786,6 +887,11 @@ export default function Settings() {
               {/* About / license attributions */}
               <AboutSection />
             </>
+          )}
+
+          {extraSections.map(
+            ({ id, Component }) =>
+              tab === `extra-${id}` && <Component key={id} />,
           )}
         </div>
       </ScrollArea>

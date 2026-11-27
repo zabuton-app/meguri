@@ -1,17 +1,39 @@
 // Regression tests for the media HTTP server: URL routing, Range serving, the
-// path-confinement guards, and the ffmpeg remux path (status-code behaviour only).
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
-import { FFMPEG } from "../ffmpeg-paths.js";
+// path-confinement guards, and the ffmpeg remux path.
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { execFileSync, type SpawnOptions } from "node:child_process";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
+import { extractMeta } from "../media.js";
+import { supportsToneMapping } from "../videoPreview.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
 import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
 import { startServer } from "../server.js";
+import { CAN_SYMLINK } from "./symlink.js";
 import type { Core } from "../index.js";
+
+// Shorten any wall-clock limit passed to spawn for the backpressure test.
+// FFmpeg and the HTTP server still run normally.
+const wallClockLimit = vi.hoisted(() => ({ ms: 0 }));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    spawn: (command: string, args: readonly string[], options?: SpawnOptions) =>
+      actual.spawn(
+        command,
+        args,
+        wallClockLimit.ms && options?.timeout
+          ? { ...options, timeout: wallClockLimit.ms }
+          : (options ?? {}),
+      ),
+  };
+});
 
 const WS = "abc123";
 const TOKEN = "test-token";
@@ -58,6 +80,33 @@ function authHeaders(): RequestInit {
   return { headers: authHeader() };
 }
 
+/**
+ * The lines of an ffprobe report. Windows ends them with CRLF, which a plain
+ * split on "\n" would leave on every line but the last (#297).
+ */
+const probeLines = (out: string): string[] => out.trim().split(/\r?\n/);
+
+/**
+ * Remove a fixture clip once ffmpeg has let go of it. Windows refuses to
+ * unlink a file a child process still holds open, which an unlink right after
+ * the requests are destroyed can race. The clip is in a temp directory, so a
+ * handle that never clears is left to the OS rather than failing the test this
+ * was cleaning up after (#297).
+ */
+async function removeClip(clip: string): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try {
+      fs.unlinkSync(clip);
+      return;
+    } catch (err) {
+      const { code } = err as NodeJS.ErrnoException;
+      if (code === "ENOENT") return;
+      if (code !== "EBUSY" && code !== "EPERM") throw err;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+}
+
 beforeAll(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-srv-root-"));
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-srv-data-"));
@@ -73,7 +122,9 @@ beforeAll(async () => {
   const outsideMedia = path.join(outside, "evil.mp4");
   fs.writeFileSync(outsideMedia, "EVIL");
   const symlinkMedia = path.join(root, "symlink.mp4");
-  fs.symlinkSync(outsideMedia, symlinkMedia);
+  // Without the privilege there is no link to serve, so the row is left out
+  // and the one case needing it is skipped below (#297).
+  if (CAN_SYMLINK) fs.symlinkSync(outsideMedia, symlinkMedia);
 
   // A real (tiny) Matroska file so the remux path actually transcodes to fMP4,
   // and a bogus one so the immediate-failure branch (0-byte output ⇒ 500) is
@@ -124,7 +175,8 @@ beforeAll(async () => {
   thumbId = mediaId;
   badThumbId = insert("b.mp4", path.join(root, "b.mp4"), outsideThumb, "done");
   outsideMediaId = insert("c.mp4", outsideMedia, null, "pending");
-  symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
+  if (CAN_SYMLINK)
+    symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
   remuxId = insert("real.mkv", remuxFile, null, "pending");
   brokenRemuxId = insert("broken.mkv", brokenFile, null, "pending");
 
@@ -148,8 +200,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  db.close();
+  // Guarded so a failure in beforeAll reports itself rather than being buried
+  // under a TypeError from closing what was never opened.
+  if (server)
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  db?.close();
 });
 
 describe("routing", () => {
@@ -199,7 +254,7 @@ describe("thumb serving", () => {
   it("serves thumbnails with Cache-Control and an ETag", async () => {
     const res = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, authHeaders());
     expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.get("etag")).toMatch(/^"\d+-\d+"$/);
   });
 
@@ -277,6 +332,96 @@ describe("media serving and Range", () => {
     expect(res.headers.get("content-range")).toBe("bytes */10");
   });
 
+  it("aborts the response when the read fails after Content-Length was sent", async () => {
+    // A short body that ends cleanly would leave a keep-alive client waiting
+    // for the missing bytes; the client must see the failure instead.
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      setImmediate(() => s.destroy(new Error("EIO")));
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      const res = await fetch(
+        `${base}/ws/${WS}/media/${mediaId}`,
+        authHeaders(),
+      );
+      expect(res.headers.get("content-length")).toBe("10");
+      // Bounded wait: on the unfixed code the body never completes (the client
+      // waits for the 5 missing bytes), so report that as an assertion, not a timeout.
+      const outcome = await Promise.race([
+        res.text().then(
+          () => "resolved",
+          () => "rejected",
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("aborts the response when the file shrinks mid-read (clean end, short body)", async () => {
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      s.push(null);
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      // The abort may surface as a rejected fetch (headers never arrive) or as a
+      // failed body read; either way the client must not see a clean 10-byte body.
+      const outcome = await Promise.race([
+        fetch(`${base}/ws/${WS}/media/${mediaId}`, authHeaders())
+          .then((r) => r.text())
+          .then(
+            () => "resolved",
+            () => "rejected",
+          ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("aborts a ranged (206) response when the read fails after Content-Length was sent", async () => {
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      setImmediate(() => s.destroy(new Error("EIO")));
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      const res = await fetch(`${base}/ws/${WS}/media/${mediaId}`, {
+        headers: { ...authHeader(), Range: "bytes=0-9" },
+      });
+      expect(res.status).toBe(206);
+      expect(res.headers.get("content-length")).toBe("10");
+      const outcome = await Promise.race([
+        res.text().then(
+          () => "resolved",
+          () => "rejected",
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("refuses an abs_path outside the scan root with 403 (path confinement)", async () => {
     expect(
       (await fetch(`${base}/ws/${WS}/media/${outsideMediaId}`, authHeaders()))
@@ -284,11 +429,39 @@ describe("media serving and Range", () => {
     ).toBe(403);
   });
 
-  it("refuses a symlink under the root that points outside with 403", async () => {
-    expect(
-      (await fetch(`${base}/ws/${WS}/media/${symlinkMediaId}`, authHeaders()))
-        .status,
-    ).toBe(403);
+  it.skipIf(!CAN_SYMLINK)(
+    "refuses a symlink under the root that points outside with 403",
+    async () => {
+      expect(
+        (await fetch(`${base}/ws/${WS}/media/${symlinkMediaId}`, authHeaders()))
+          .status,
+      ).toBe(403);
+    },
+  );
+
+  // A synchronous realpath on a root on a network share would block the main
+  // process on every thumbnail, media and frame request (#275).
+  it("checks the paths without a synchronous realpath", async () => {
+    const native = vi.spyOn(fs.realpathSync, "native");
+    const sync = vi.spyOn(fs, "realpathSync");
+    try {
+      const statuses = [];
+      for (const url of [
+        `${base}/ws/${WS}/thumb/${thumbId}`,
+        `${base}/ws/${WS}/media/${mediaId}`,
+        `${base}/ws/${WS}/media/${outsideMediaId}`,
+      ]) {
+        const res = await fetch(url, authHeaders());
+        await res.arrayBuffer();
+        statuses.push(res.status);
+      }
+      expect(statuses).toEqual([200, 200, 403]);
+      expect(sync).not.toHaveBeenCalled();
+      expect(native).not.toHaveBeenCalled();
+    } finally {
+      sync.mockRestore();
+      native.mockRestore();
+    }
   });
 });
 
@@ -382,7 +555,608 @@ describe("frame serving (ffmpeg path)", () => {
   });
 });
 
+describe("waveform serving (ffmpeg path)", () => {
+  let toneId: number;
+  beforeAll(() => {
+    const tone = path.join(root, "tone.wav");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=1",
+      tone,
+    ]);
+    toneId = insert("tone.wav", tone, null, "done", "audio", "wav");
+  });
+
+  it("serves a PNG waveform for an audio file", async () => {
+    const res = await fetch(
+      `${base}/ws/${WS}/waveform/${toneId}`,
+      authHeaders(),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect([...buf.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+
+  it("refuses a waveform for a video", async () => {
+    const res = await fetch(
+      `${base}/ws/${WS}/waveform/${remuxId}`,
+      authHeaders(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a waveform without the token", async () => {
+    const res = await fetch(`${base}/ws/${WS}/waveform/${toneId}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("still image transcoding (ffmpeg path)", () => {
+  it("serves the whole grid of a tiled HEIF as a JPEG", async () => {
+    const heic = path.join(root, "grid.heic");
+    fs.copyFileSync(
+      fileURLToPath(new URL("./fixtures/grid-1024x512.heic", import.meta.url)),
+      heic,
+    );
+    const id = insert("grid.heic", heic, null, "done", "image", "heic");
+    const res = await fetch(`${base}/ws/${WS}/media/${id}`, authHeaders());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    const size = execFileSync(
+      FFPROBE,
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=p=0",
+        "pipe:0",
+      ],
+      { input: Buffer.from(await res.arrayBuffer()), encoding: "utf8" },
+    );
+    // One 512x512 tile would come out square.
+    expect(size.trim()).toBe("1024,512");
+  });
+});
+
+describe("MKV audio track selection", () => {
+  const fixtures = [
+    { first: "96x64", second: "128x72", expectedWidth: 96 },
+    { first: "1920x1080", second: "3840x2160", expectedWidth: 3840 },
+  ];
+  it.each(fixtures)("keeps picture for $first / $second", async (fixture) => {
+    const { first, second, expectedWidth } = fixture;
+    const name = `alternate-language-${second}.mkv`;
+    const clip = path.join(root, name);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=red:size=${first}:rate=12:duration=1`,
+      "-f",
+      "lavfi",
+      "-i",
+      `color=blue:size=${second}:rate=12:duration=1`,
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=44100:duration=1",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=1",
+      "-map",
+      "0:v",
+      "-map",
+      "1:v",
+      "-map",
+      "2:a",
+      "-map",
+      "3:a",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-threads:v",
+      "2",
+      "-c:a:0",
+      "aac",
+      "-c:a:1",
+      "ac3",
+      "-ac:a:1",
+      "2",
+      "-disposition:v:0",
+      "default",
+      "-disposition:v:1",
+      "0",
+      "-disposition:a:0",
+      "0",
+      "-disposition:a:1",
+      "0",
+      clip,
+    ]);
+    const original = fs.readFileSync(clip);
+    const metadata = await extractMeta(clip, "video");
+    const id = insert(name, clip, null, "done", "video", "mkv");
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    const url = `${base}/ws/${WS}/media/${id}`;
+    const preview = async (search: string) => {
+      const result = await fetch(url + search, authHeaders());
+      expect(result.status).toBe(200);
+      return Buffer.from(await result.arrayBuffer());
+    };
+    const streams = (input: Buffer) =>
+      JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,width,sample_rate",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input, encoding: "utf8" },
+        ),
+      ) as {
+        streams: {
+          codec_name: string;
+          width?: number;
+          sample_rate?: string;
+        }[];
+      };
+    const audioPacketHashes = (input: Buffer) => {
+      const { packets } = JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
+            "packet=data_hash",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input, encoding: "utf8" },
+        ),
+      ) as { packets: { data_hash: string }[] };
+      // ffprobe 9 also reports the container's side data on a packet (the
+      // AAC priming samples to skip); this compares the encoded payloads.
+      return packets.map(({ data_hash }) => data_hash);
+    };
+    const [automatic, aac, dolby] = await Promise.all([
+      preview(""),
+      preview("?audioTrack=0"),
+      preview("?audioTrack=1"),
+    ]);
+    expect(streams(automatic).streams).toEqual([
+      { codec_name: "h264", width: expectedWidth },
+      { codec_name: "aac", sample_rate: "48000" },
+    ]);
+    expect(streams(aac).streams).toEqual([
+      { codec_name: "h264", width: expectedWidth },
+      { codec_name: "aac", sample_rate: "44100" },
+    ]);
+    expect(streams(dolby).streams).toEqual(streams(automatic).streams);
+    const sourceHashes = audioPacketHashes(original);
+    expect(sourceHashes.length).toBeGreaterThan(0);
+    expect(audioPacketHashes(aac)).toEqual(sourceHashes);
+    expect((await fetch(url + "?audioTrack=2", authHeaders())).status).toBe(
+      400,
+    );
+    expect(fs.readFileSync(clip).equals(original)).toBe(true);
+  });
+});
+
+describe("unindexed ProRes playback", () => {
+  it("serves an H.264 preview before the scan writes the codec", async () => {
+    const clip = path.join(root, "unindexed.mov");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=1",
+      "-c:v",
+      "prores_ks",
+      "-profile:v",
+      "standard",
+      "-pix_fmt",
+      "yuv422p10le",
+      clip,
+    ]);
+    const id = insert("unindexed.mov", clip, null, "pending", "video", "mov");
+    const url = `${base}/ws/${WS}/media/${id}`;
+    const head = await fetch(url, { ...authHeaders(), method: "HEAD" });
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-type")).toBe("video/mp4");
+    const preview = await fetch(url, authHeaders());
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get("content-type")).toBe("video/mp4");
+    const output = Buffer.from(await preview.arrayBuffer());
+    const streams = JSON.parse(
+      execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "stream=codec_name",
+          "-of",
+          "json",
+          "pipe:0",
+        ],
+        { input: output, encoding: "utf8" },
+      ),
+    ) as { streams: unknown };
+    expect(streams.streams).toEqual([{ codec_name: "h264" }]);
+    expect(db.prepare("SELECT codec FROM files WHERE id = ?").get(id)).toEqual({
+      codec: null,
+    });
+  });
+});
+
+describe("ProRes preview capacity", () => {
+  it("keeps paused previews when idle and reclaims a slot for a waiting preview", async () => {
+    const clip = path.join(root, "preview-capacity.mov");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=640x360:rate=24:duration=25",
+      "-c:v",
+      "prores_ks",
+      "-threads",
+      "2",
+      "-profile:v",
+      "standard",
+      "-pix_fmt",
+      "yuv422p10le",
+      clip,
+    ]);
+    const id = insert(
+      "preview-capacity.mov",
+      clip,
+      null,
+      "done",
+      "video",
+      "mov",
+    );
+    db.prepare("UPDATE files SET codec = 'prores' WHERE id = ?").run(id);
+    const route = `/ws/${WS}/media/${id}`;
+    const responses = new Map<string, http.ServerResponse>();
+    const stalledWrites = new Set<string>();
+    const observe = (req: http.IncomingMessage, res: http.ServerResponse) => {
+      const url = new URL(req.url ?? "/", base);
+      if (url.pathname !== route) return;
+      const t = url.searchParams.get("t") ?? "";
+      responses.set(t, res);
+      if (t === "24") return;
+      // Report every write as backed up, as a socket that stopped draining
+      // would. The kernel's socket buffers can otherwise take the whole small
+      // preview (several MB on Linux) before the server sees backpressure.
+      const write = res.write.bind(res) as (...args: unknown[]) => boolean;
+      res.write = ((...args: unknown[]) => {
+        write(...args);
+        stalledWrites.add(t);
+        return false;
+      }) as typeof res.write;
+    };
+    const stalled: http.ClientRequest[] = [];
+    server.on("request", observe);
+    vi.useFakeTimers({
+      toFake: ["performance", "setInterval", "clearInterval"],
+    });
+    try {
+      for (const t of [0, 1]) {
+        const request = http.get(`${base}${route}?t=${t}`, {
+          headers: authHeader(),
+        });
+        request.on("error", () => undefined);
+        request.on("response", (response) => {
+          response.on("error", () => undefined);
+          response.pause();
+        });
+        stalled.push(request);
+      }
+      await expect.poll(() => stalledWrites.size, { timeout: 6_000 }).toBe(2);
+      vi.advanceTimersByTime(130_000);
+      expect([...responses.values()].some((res) => res.destroyed)).toBe(false);
+
+      const queued = fetch(`${base}${route}?t=24`, authHeaders());
+      const reclaimed = () =>
+        [responses.get("0"), responses.get("1")].filter((res) => res?.destroyed)
+          .length;
+      // The request probes the clip before it queues for a slot, so keep the
+      // watchdog ticking until it reclaims one, then let the new preview run
+      // in real time.
+      await expect
+        .poll(
+          () => {
+            vi.advanceTimersByTime(5_000);
+            return reclaimed();
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(1);
+      const response = await queued;
+      expect(response.status).toBe(200);
+      expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
+      expect(reclaimed()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+      server.off("request", observe);
+      for (const request of stalled) request.destroy();
+      await removeClip(clip);
+    }
+  }, 15_000);
+});
+
 describe("media remux (ffmpeg path)", () => {
+  it.each([
+    { container: "mp4", codec: "eac3", indexed: true },
+    { container: "m4v", codec: "ac3", indexed: true },
+    { container: "mov", codec: "eac3", indexed: false },
+  ])(
+    "converts default $codec in $container and preserves Range for default AAC",
+    async ({ container, codec, indexed }) => {
+      const clip = path.join(root, `dolby-default.${container}`);
+      const aac = path.join(root, `aac-default.${container}`);
+      const outputFormat = container === "mov" ? "mov" : "mp4";
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=660:sample_rate=48000:duration=2",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "2:a",
+        "-c:v",
+        "libx264",
+        "-g",
+        "6",
+        "-c:a:0",
+        "aac",
+        "-c:a:1",
+        codec,
+        "-ac:a:1",
+        "6",
+        "-disposition:a:0",
+        "0",
+        "-disposition:a:1",
+        "default",
+        "-f",
+        outputFormat,
+        clip,
+      ]);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-i",
+        clip,
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-disposition:a:0",
+        "default",
+        "-disposition:a:1",
+        "0",
+        "-f",
+        outputFormat,
+        aac,
+      ]);
+      const original = fs.readFileSync(clip);
+      async function route(file: string) {
+        const id = insert(
+          path.basename(file),
+          file,
+          null,
+          "done",
+          "video",
+          container,
+        );
+        if (indexed) {
+          const metadata = await extractMeta(file, "video");
+          db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+            metadata.codec,
+            JSON.stringify(metadata.raw),
+            id,
+          );
+        }
+        return `${base}/ws/${WS}/media/${id}`;
+      }
+      const url = await route(clip);
+      const head = await fetch(url, { ...authHeaders(), method: "HEAD" });
+      expect(head.headers.get("Content-Type")).toBe("video/mp4");
+      for (const seek of ["", "?t=0.5"]) {
+        const response = await fetch(`${url}${seek}`, authHeaders());
+        expect(response.status).toBe(200);
+        const streams = execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,channels",
+            "-of",
+            "compact=p=0:nk=1",
+            "pipe:0",
+          ],
+          {
+            input: Buffer.from(await response.arrayBuffer()),
+            encoding: "utf8",
+          },
+        );
+        expect(probeLines(streams)).toEqual(["h264", "aac|6"]);
+      }
+      expect(fs.readFileSync(clip)).toEqual(original);
+
+      const range = await fetch(await route(aac), {
+        headers: { ...authHeaders().headers, Range: "bytes=0-15" },
+      });
+      expect(range.status).toBe(206);
+      expect(Buffer.from(await range.arrayBuffer())).toEqual(
+        fs.readFileSync(aac).subarray(0, 16),
+      );
+    },
+  );
+
+  it.each(["ac3", "eac3"])(
+    "copies the HEVC picture and converts Dolby Digital %s surround audio to AAC",
+    async (codec) => {
+      const name = `dolby-${codec}.mkv`;
+      const clip = path.join(root, name);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=1",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=channel_layout=5.1:sample_rate=48000:duration=1",
+        "-c:v",
+        "libx265",
+        "-pix_fmt",
+        "yuv420p10le",
+        "-preset",
+        "ultrafast",
+        "-x265-params",
+        // With ffmpeg 9, -color_trc no longer tags this stream, so x265 is
+        // told the transfer directly.
+        "pools=none:frame-threads=1:log-level=error:transfer=bt709",
+        "-c:a",
+        codec,
+        clip,
+      ]);
+      const original = fs.readFileSync(clip);
+      const metadata = await extractMeta(clip, "video");
+      const id = insert(name, clip, null, "done", "video", "mkv");
+      const updateMeta = db.prepare(
+        "UPDATE files SET codec = ?, meta = ? WHERE id = ?",
+      );
+      updateMeta.run(metadata.codec, JSON.stringify(metadata.raw), id);
+      const url = `${base}/ws/${WS}/media/${id}`;
+
+      const videoPackets = (input: Buffer) => {
+        const packets = JSON.parse(
+          execFileSync(
+            FFPROBE,
+            [
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_packets",
+              "-show_data_hash",
+              "md5",
+              "-show_entries",
+              "packet=pts_time,data_hash",
+              "-of",
+              "json",
+              "pipe:0",
+            ],
+            { input, encoding: "utf8" },
+          ),
+        ) as { packets: { pts_time: string; data_hash: string }[] };
+        return packets.packets;
+      };
+      const originalTimestamps = new Map(
+        videoPackets(original).map((packet) => [
+          packet.data_hash,
+          Number(packet.pts_time),
+        ]),
+      );
+
+      for (const search of ["", "?t=0.5"]) {
+        const response = await fetch(url + search, authHeaders());
+        expect(response.status).toBe(200);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        const result = JSON.parse(
+          execFileSync(
+            FFPROBE,
+            [
+              "-v",
+              "error",
+              "-show_entries",
+              "stream=codec_name,pix_fmt,color_transfer,channels",
+              "-of",
+              "json",
+              "pipe:0",
+            ],
+            {
+              input: bytes,
+              encoding: "utf8",
+            },
+          ),
+        ) as { streams: unknown };
+        expect(result.streams).toEqual([
+          {
+            codec_name: "hevc",
+            pix_fmt: "yuv420p10le",
+            color_transfer: "bt709",
+          },
+          { codec_name: "aac", channels: 6 },
+        ]);
+        if (search) {
+          const firstPacket = videoPackets(bytes)[0];
+          const originalTime = originalTimestamps.get(firstPacket.data_hash);
+          expect(originalTime).toBeDefined();
+          // The preroll picture keeps its offset relative to the seek target,
+          // instead of starting at zero while the audio is already at 0.5 s.
+          expect(originalTime! - Number(firstPacket.pts_time)).toBeCloseTo(
+            0.5,
+            1,
+          );
+        }
+        // A subsequent seek still works if scan metadata is not ready.
+        updateMeta.run(null, null, id);
+      }
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
+  );
+
   it("remuxes an mkv to fragmented MP4 with a 200", async () => {
     const res = await fetch(`${base}/ws/${WS}/media/${remuxId}`, authHeaders());
     expect(res.status).toBe(200);
@@ -418,7 +1192,7 @@ describe("media remux (ffmpeg path)", () => {
 
   // Streamed GET that resolves `first` on the first body chunk and `done` with
   // the full body — fetch() cannot observe mid-stream progress like this.
-  function getStreaming(pathname: string) {
+  function getStreaming(pathname: string, pauseMs = 0) {
     const chunks: Buffer[] = [];
     let resolveFirst!: () => void;
     const first = new Promise<void>((r) => (resolveFirst = r));
@@ -428,6 +1202,10 @@ describe("media remux (ffmpeg path)", () => {
           `${base}${pathname}`,
           { headers: authHeader() },
           (res) => {
+            if (pauseMs) {
+              res.pause();
+              setTimeout(() => res.resume(), pauseMs);
+            }
             res.on("data", (c: Buffer) => {
               chunks.push(c);
               resolveFirst();
@@ -445,6 +1223,57 @@ describe("media remux (ffmpeg path)", () => {
     );
     return { first, done };
   }
+
+  it("completes a copy remux after the client pauses beyond the old deadline", async () => {
+    const name = "backpressure.mkv";
+    const clip = path.join(root, name);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=640x360:rate=24:duration=90",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "13",
+      "-g",
+      "24",
+      clip,
+    ]);
+    const id = insert(name, clip, null, "pending", "video", "mkv");
+    wallClockLimit.ms = 1_000;
+    try {
+      const { status, body } = await getStreaming(
+        `/ws/${WS}/media/${id}`,
+        1_500,
+      ).done;
+      expect(status).toBe(200);
+      const packets = execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-count_packets",
+          "-show_entries",
+          "stream=nb_read_packets",
+          "-of",
+          "csv=p=0",
+          "pipe:0",
+        ],
+        { input: body, encoding: "utf8" },
+      );
+      expect(Number(packets.trim())).toBe(90 * 24);
+    } finally {
+      wallClockLimit.ms = 0;
+      await removeClip(clip);
+    }
+  }, 15_000);
 
   it.skipIf(process.platform === "win32")(
     "replays the fMP4 init segment to a client joining an in-flight session",
@@ -478,4 +1307,419 @@ describe("media remux (ffmpeg path)", () => {
     },
     15_000,
   );
+});
+
+describe("ProRes previews", () => {
+  it.each([
+    ["PQ", "smpte2084", "bt2020", "bt2020nc"],
+    ["HLG", "arib-std-b67", "bt2020", "bt2020nc"],
+    ["SDR", "bt709", "bt709", "bt709"],
+    ["wide-gamut SDR", "bt2020-10", "bt2020", "bt2020nc"],
+    ["untagged", "unknown", "unknown", "unknown"],
+  ])(
+    "serves %s footage with the appropriate color tags",
+    async (name, transfer, primaries, matrix) => {
+      const filename = `preview-${name}.mov`;
+      const clip = path.join(root, filename);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=1",
+        // ffmpeg 9 no longer tags the stream from -color_trc and friends.
+        ...(transfer === "unknown"
+          ? []
+          : [
+              "-vf",
+              `setparams=color_trc=${transfer}:color_primaries=${primaries}:colorspace=${matrix}`,
+            ]),
+        "-c:v",
+        "prores_ks",
+        "-profile:v",
+        "standard",
+        "-pix_fmt",
+        "yuv422p10le",
+        "-movflags",
+        "+write_colr",
+        clip,
+      ]);
+      const original = fs.readFileSync(clip);
+      const meta = await extractMeta(clip, "video");
+      expect(meta.codec).toBe("prores");
+      const id = insert(filename, clip, null, "done", "video", "mov");
+      db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+        meta.codec,
+        JSON.stringify(meta.raw),
+        id,
+      );
+
+      const res = await fetch(
+        `${base}/ws/${WS}/media/${id}?t=0.25`,
+        authHeaders(),
+      );
+      expect(res.status).toBe(200);
+      const bytes = Buffer.from(await res.arrayBuffer());
+      const { streams } = JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_streams",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input: bytes, encoding: "utf8" },
+        ),
+      ) as {
+        streams: {
+          codec_name: string;
+          color_transfer?: string;
+          color_primaries?: string;
+          color_space?: string;
+        }[];
+      };
+      expect(streams[0].codec_name).toBe("h264");
+      // The bundled ffmpeg has zscale and tonemap, so HDR must take that path.
+      expect(await supportsToneMapping()).toBe(true);
+      const toneMapped = name === "PQ" || name === "HLG";
+      expect(streams[0].color_transfer ?? "unknown").toBe(
+        toneMapped ? "bt709" : transfer,
+      );
+      expect(streams[0].color_primaries ?? "unknown").toBe(
+        toneMapped ? "bt709" : primaries,
+      );
+      expect(streams[0].color_space ?? "unknown").toBe(
+        toneMapped ? "bt709" : matrix,
+      );
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
+  );
+});
+
+describe("codecs the player cannot decode", () => {
+  // Make a two-second clip, index it as the scan would, and return its URL.
+  async function indexed(name: string, video: string[], audio: string[]) {
+    const clip = path.join(root, name);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=2",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=2",
+      ...video,
+      ...audio,
+      clip,
+    ]);
+    const metadata = await extractMeta(clip, "video");
+    const id = insert(
+      name,
+      clip,
+      null,
+      "done",
+      "video",
+      path.extname(name).slice(1),
+    );
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    return { clip, url: `${base}/ws/${WS}/media/${id}` };
+  }
+
+  async function served(url: string): Promise<string[]> {
+    const response = await fetch(url, authHeaders());
+    expect(response.status).toBe(200);
+    const report = execFileSync(
+      FFPROBE,
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_name",
+        "-of",
+        "compact=p=0:nk=1",
+        "pipe:0",
+      ],
+      { input: Buffer.from(await response.arrayBuffer()), encoding: "utf8" },
+    );
+    return probeLines(report);
+  }
+
+  it.each([
+    {
+      name: "mpeg4.avi",
+      video: ["-c:v", "mpeg4"],
+      audio: ["-c:a", "libmp3lame"],
+    },
+    { name: "mpeg4.mp4", video: ["-c:v", "mpeg4"], audio: ["-c:a", "aac"] },
+    {
+      name: "mjpeg.mov",
+      video: ["-c:v", "mjpeg"],
+      audio: ["-c:a", "pcm_s16le"],
+    },
+  ])(
+    "serves $name as an H.264 preview with AAC audio",
+    async ({ name, video, audio }) => {
+      const { clip, url } = await indexed(name, video, audio);
+      const original = fs.readFileSync(clip);
+      expect(await served(`${url}?t=0.5`)).toEqual(["h264", "aac"]);
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
+  );
+
+  it.each([
+    { name: "mp2.mkv", codec: "mp2" },
+    { name: "alac.mov", codec: "alac" },
+    { name: "alaw.mkv", codec: "pcm_alaw" },
+  ])(
+    "copies the picture of $name and converts its audio to AAC",
+    async ({ name, codec }) => {
+      const { url } = await indexed(
+        name,
+        ["-c:v", "libx264", "-g", "6"],
+        ["-c:a", codec],
+      );
+      expect(await served(url)).toEqual(["h264", "aac"]);
+    },
+  );
+
+  it("previews a remux whose copy FFmpeg refuses", async () => {
+    // The MP4 muxer has no tag for VP8, so copying it out of MKV writes nothing.
+    const { url } = await indexed(
+      "vp8.mkv",
+      ["-c:v", "libvpx"],
+      ["-c:a", "libvorbis"],
+    );
+    expect(await served(url)).toEqual(["h264", "aac"]);
+  });
+
+  it.each([
+    { name: "default-second-mpeg4.mkv", codec: "mpeg4" },
+    { name: "default-second-vp8.mkv", codec: "libvpx" },
+  ])(
+    "previews $name with the audio track marked default",
+    async ({ name, codec }) => {
+      // A mono first track and a stereo default second one, told apart by
+      // their channel count in the output.
+      const clip = path.join(root, name);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=2",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "1:a",
+        "-c:v",
+        codec,
+        "-c:a",
+        "libvorbis",
+        "-ac:a:0",
+        "1",
+        "-ac:a:1",
+        "2",
+        "-disposition:a:0",
+        "0",
+        "-disposition:a:1",
+        "default",
+        clip,
+      ]);
+      const metadata = await extractMeta(clip, "video");
+      const id = insert(name, clip, null, "done", "video", "mkv");
+      db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+        metadata.codec,
+        JSON.stringify(metadata.raw),
+        id,
+      );
+      const response = await fetch(
+        `${base}/ws/${WS}/media/${id}`,
+        authHeaders(),
+      );
+      expect(response.status).toBe(200);
+      const streams = execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "stream=codec_name,channels",
+          "-of",
+          "compact=p=0:nk=1",
+          "pipe:0",
+        ],
+        {
+          input: Buffer.from(await response.arrayBuffer()),
+          encoding: "utf8",
+        },
+      );
+      expect(probeLines(streams)).toEqual(["h264", "aac|2"]);
+    },
+  );
+
+  it("serves an MP4 or MOV with PCM audio as it is, with Range", async () => {
+    const { clip, url } = await indexed(
+      "pcm.mov",
+      ["-c:v", "libx264"],
+      ["-c:a", "pcm_s16le"],
+    );
+    const range = await fetch(url, {
+      headers: { ...authHeader(), Range: "bytes=0-15" },
+    });
+    expect(range.status).toBe(206);
+    expect(Buffer.from(await range.arrayBuffer())).toEqual(
+      fs.readFileSync(clip).subarray(0, 16),
+    );
+  });
+});
+
+// Some tools write the cover's udta box before the tracks, so ffprobe lists the
+// cover (attached_pic) as stream 0. ffmpeg's own MP4 muxer always puts it
+// after, so the test moves the box. Moving it inside moov keeps moov's size,
+// so the chunk offsets into mdat stay valid.
+function moveCoverFirst(file: string) {
+  const data = fs.readFileSync(file);
+  const boxes = (buf: Buffer, start: number, end: number) => {
+    const found: { type: string; start: number; end: number }[] = [];
+    for (let at = start; at + 8 <= end;) {
+      const size = buf.readUInt32BE(at);
+      found.push({
+        type: buf.toString("latin1", at + 4, at + 8),
+        start: at,
+        end: at + size,
+      });
+      at += size;
+    }
+    return found;
+  };
+  const moov = boxes(data, 0, data.length).find((b) => b.type === "moov")!;
+  const children = boxes(data, moov.start + 8, moov.end);
+  const udta = children.find((b) => b.type === "udta")!;
+  const firstTrak = children.find((b) => b.type === "trak")!;
+  const rest = children.filter((b) => b !== udta);
+  const ordered = [
+    ...rest.slice(0, rest.indexOf(firstTrak)),
+    udta,
+    ...rest.slice(rest.indexOf(firstTrak)),
+  ];
+  const body = Buffer.concat(ordered.map((b) => data.subarray(b.start, b.end)));
+  body.copy(data, moov.start + 8);
+  fs.writeFileSync(file, data);
+}
+
+describe("a cover picture listed before the video stream", () => {
+  async function withCover(name: string, codec: string) {
+    const clip = path.join(root, name);
+    const cover = path.join(root, `${name}.png`);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:size=64x64",
+      "-frames:v",
+      "1",
+      cover,
+    ]);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=2",
+      "-i",
+      cover,
+      "-map",
+      "0",
+      "-map",
+      "1",
+      "-c:v:0",
+      codec,
+      "-c:v:1",
+      "png",
+      "-disposition:v:1",
+      "attached_pic",
+      clip,
+    ]);
+    moveCoverFirst(clip);
+    const metadata = await extractMeta(clip, "video");
+    const streams = (metadata.raw as { streams: { codec_name: string }[] })
+      .streams;
+    expect(streams[0].codec_name).toBe("png");
+    const id = insert(name, clip, null, "done", "video", "mp4");
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    return { clip, codec: metadata.codec, url: `${base}/ws/${WS}/media/${id}` };
+  }
+
+  it("stores the picture's codec and serves an H.264 file as it is", async () => {
+    const { clip, codec, url } = await withCover("cover-h264.mp4", "libx264");
+    expect(codec).toBe("h264");
+    const range = await fetch(url, {
+      headers: { ...authHeader(), Range: "bytes=0-15" },
+    });
+    expect(range.status).toBe(206);
+    expect(Buffer.from(await range.arrayBuffer())).toEqual(
+      fs.readFileSync(clip).subarray(0, 16),
+    );
+  });
+
+  it("previews the picture, not the cover", async () => {
+    const { codec, url } = await withCover("cover-mpeg4.mp4", "mpeg4");
+    expect(codec).toBe("mpeg4");
+    const response = await fetch(url, authHeaders());
+    expect(response.status).toBe(200);
+    const { streams } = JSON.parse(
+      execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,width,nb_read_frames",
+          "-of",
+          "json",
+          "pipe:0",
+        ],
+        { input: Buffer.from(await response.arrayBuffer()), encoding: "utf8" },
+      ),
+    ) as {
+      streams: { codec_name: string; width: number; nb_read_frames: string }[];
+    };
+    expect(streams[0].codec_name).toBe("h264");
+    expect(streams[0].width).toBe(96);
+    expect(Number(streams[0].nb_read_frames)).toBeGreaterThan(12);
+  });
 });

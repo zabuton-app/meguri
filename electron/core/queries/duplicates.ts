@@ -87,7 +87,11 @@ export function fileIdsByContentHashes(
        WHERE deleted_at IS NULL AND size IS NOT NULL
          AND content_hash IN (SELECT value FROM json_each(?))`,
     )
-    .all(JSON.stringify(hashes)) as { id: number; hash: string; size: number }[];
+    .all(JSON.stringify(hashes)) as {
+    id: number;
+    hash: string;
+    size: number;
+  }[];
 }
 
 /**

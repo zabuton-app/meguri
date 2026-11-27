@@ -82,7 +82,7 @@ export function TagMergeDialog({
               {tags.map((tag) => (
                 <label
                   key={tag.qualified}
-                  className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-fg/5"
+                  className="flex cursor-pointer items-center gap-2 rounded-item px-1 py-1 text-sm hover:bg-fg/10"
                 >
                   <input
                     type="radio"

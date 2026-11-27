@@ -1,6 +1,6 @@
 // Catalog-level tag operations for the tag management screen: aggregate listing
 // plus rename / merge / delete. Everything here works on ONE workspace database;
-// fanning out across the workspaces in scope is main.ts's job.
+// fanning out across the workspaces in scope is app.ts's job.
 //
 // Tags are addressed by (namespace, name), never by tags.id — ids are
 // database-local and meaningless in the cross-workspace "All" view.

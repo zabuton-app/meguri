@@ -439,24 +439,15 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   // Scans and workspace switches. scan:progress fires many times a second,
   // so only a job starting or ending is passed on; thumb:done is ignored.
   useEffect(() => {
-    let cancelled = false;
-    const unlistens: Array<() => void> = [];
-    const keep = (subscription: Promise<() => void>) =>
-      void subscription.then((unlisten) => {
-        if (cancelled) unlisten();
-        else unlistens.push(unlisten);
-      });
     // Under "All" every workspace is scanned as a job of its own: the pet
     // works until the last of them is done.
     const jobs = new Set<string>();
-    keep(
+    const unlistens = [
       events.onScanProgress(({ jobId }) => {
         if (jobs.has(jobId)) return;
         jobs.add(jobId);
         if (jobs.size === 1) dispatch({ type: "working", active: true });
       }),
-    );
-    keep(
       events.onScanDone((done) => {
         jobs.delete(done.jobId);
         if (jobs.size > 0) return;
@@ -465,16 +456,11 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
         if (done.error || done.aborted) return;
         dispatch({ type: "react", reactions: ["cheer"] });
       }),
-    );
-    keep(
       events.onWorkspaceChanged(() =>
         dispatch({ type: "react", reactions: ["lookAround"] }),
       ),
-    );
-    return () => {
-      cancelled = true;
-      unlistens.forEach((unlisten) => unlisten());
-    };
+    ];
+    return () => unlistens.forEach((unlisten) => unlisten());
   }, []);
 
   // A hop's jump is a transform on the sprite alone: the button (the hit

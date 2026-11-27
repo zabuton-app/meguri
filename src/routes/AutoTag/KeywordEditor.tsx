@@ -85,7 +85,7 @@ export function KeywordEditor({
         heading={
           <SmallButton
             variant="ghost"
-            className="ml-auto h-[26px] hover:text-error"
+            className="ml-auto h-7 hover:text-error"
             onClick={onDelete}
           >
             {t("autoTag.deleteKeyword")}
@@ -140,14 +140,14 @@ export function KeywordEditor({
         <span className="text-xs text-muted">{t(MODE_HINTS[entry.mode])}</span>
       </div>
 
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border">
+      <div className="flex flex-col overflow-hidden rounded-card border border-border">
         <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 text-xs text-fg">
           <span className="font-semibold">{t("autoTag.matchingFiles")}</span>
           <span className="text-muted">
             {t("autoTag.fileCount", { count: rows.length })}
           </span>
           <SmallButton
-            className="ml-auto h-[26px] gap-1 border-border px-2"
+            className="ml-auto h-7 gap-1 border-border px-2"
             title={t("autoTag.searchInLibraryHint")}
             onClick={searchInLibrary}
           >
@@ -160,7 +160,7 @@ export function KeywordEditor({
             key={i}
             className={cn(
               MONO,
-              "break-all border-b border-surface px-3 py-1.5 text-[13px] text-fg",
+              "break-all border-b border-surface px-3 py-1.5 text-xs text-fg",
             )}
           >
             <Highlighted segs={segments(row.name, row.hits)} />

@@ -2,6 +2,29 @@
 // validation schemas. ChannelInputs / ChannelOutputs in channels.ts must cover
 // every INVOKE_CHANNELS entry (enforced at compile time there).
 
+/**
+ * Prefixes of the renderer process arguments that carry the app's name and
+ * one-character mark from the main process (webPreferences.additionalArguments)
+ * to the preload, which exposes them as window.api.appName and appGlyph.
+ * Arguments rather than a channel so the renderer has them synchronously,
+ * before its first render.
+ */
+export const APP_NAME_ARG = "--app-name=";
+export const APP_GLYPH_ARG = "--app-glyph=";
+/**
+ * The media server's origin (window.api.mediaOrigin). The same value as
+ * app_status's mediaBase, but the renderer's CSP needs it synchronously,
+ * before the first request, to allow that one port on 127.0.0.1 instead of
+ * all of them (public/media-csp.js).
+ */
+export const MEDIA_ORIGIN_ARG = "--media-origin=";
+/**
+ * When the main process started (its performance.timeOrigin, epoch ms), so
+ * the renderer's startup timings count from the same point as main's
+ * (window.api.startupOrigin, shared/startupTiming.ts).
+ */
+export const STARTUP_ORIGIN_ARG = "--startup-origin=";
+
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
   "app_status",
@@ -23,6 +46,11 @@ export const INVOKE_CHANNELS = [
   "collection_add_file",
   "collection_remove_file",
   "collection_set_membership",
+  "smart_collections_list",
+  "smart_collections_import",
+  "smart_collection_add",
+  "smart_collection_remove",
+  "smart_collection_set_default",
   "scan_start",
   "scan_cancel",
   "scan_unreadable_workspaces",
@@ -36,6 +64,8 @@ export const INVOKE_CHANNELS = [
   "activity_days",
   "timeline_counts",
   "file_get",
+  "file_download_origin",
+  "file_subtitles",
   "file_set_rating",
   "file_set_favorite",
   "file_set_note",
@@ -44,6 +74,8 @@ export const INVOKE_CHANNELS = [
   "file_save_position",
   "history_list",
   "duplicates_list",
+  "missing_files_list",
+  "missing_files_purge",
   "history_clear",
   "file_add_tag",
   "files_bulk_tag",
@@ -75,12 +107,29 @@ export const INVOKE_CHANNELS = [
   "open_url",
   "open_devtools",
   "window_close",
+  "window_minimize",
+  "window_toggle_maximize",
+  "window_state",
+  "window_title_bar_double_click",
+  "window_set_button_position",
+  "window_set_button_visibility",
   "update_check",
   "update_get_settings",
   "update_set_auto_check",
   "update_ignore",
+  "crash_reports_list",
+  "crash_report_delete",
+  "crash_reports_open_folder",
   "logo_get",
   "logo_set",
+  "logo_images",
+  "scan_exclusions_get",
+  "scan_exclusions_set_patterns",
+  "scan_exclusions_folders",
+  "scan_exclusions_add_folder",
+  "scan_exclusions_update_folders",
+  "scan_exclusions_pick_folder",
+  "scan_exclusions_preview",
   "custom_css_get",
   "custom_css_set_enabled",
   "custom_css_open",
@@ -108,6 +157,7 @@ export const EVENT_CHANNELS = [
   "library:merge",
   "custom-css:changed",
   "css-themes:changed",
+  "window:state",
 ] as const;
 
 export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];
@@ -115,3 +165,39 @@ export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];
 export type InvokeChannel =
   (typeof INVOKE_CHANNELS)[number] | PreloadInvokeChannel;
 export type EventChannel = (typeof EVENT_CHANNELS)[number];
+
+/**
+ * Prefixes of the renderer process arguments that carry an app's own channels
+ * (`extraChannels` in startApp()) to the preload, which adds them to its
+ * whitelist. Comma-separated, so main builds them with extraChannelArgs().
+ */
+export const EXTRA_INVOKE_CHANNELS_ARG = "--extra-invoke-channels=";
+export const EXTRA_EVENT_CHANNELS_ARG = "--extra-event-channels=";
+
+/** Channels an app adds to the preload's whitelist (see startApp()). */
+export interface ExtraChannels {
+  invoke: string[];
+  events: string[];
+}
+
+/**
+ * The renderer process arguments for `extra`. Throws on a name that is empty
+ * or holds a comma (it would reach the preload as other names), and on a
+ * preload-only channel, which would let the renderer forge its input.
+ */
+export function extraChannelArgs(extra: ExtraChannels): string[] {
+  for (const name of [...extra.invoke, ...extra.events]) {
+    if (!name || name.includes(",")) {
+      throw new Error(`Invalid extra IPC channel name: "${name}"`);
+    }
+  }
+  for (const name of extra.invoke) {
+    if ((PRELOAD_INVOKE_CHANNELS as readonly string[]).includes(name)) {
+      throw new Error(`Preload-only IPC channel cannot be extra: "${name}"`);
+    }
+  }
+  return [
+    `${EXTRA_INVOKE_CHANNELS_ARG}${extra.invoke.join(",")}`,
+    `${EXTRA_EVENT_CHANNELS_ARG}${extra.events.join(",")}`,
+  ];
+}

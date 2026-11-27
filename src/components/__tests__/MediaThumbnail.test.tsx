@@ -16,7 +16,10 @@ import {
 } from "@/test/fixtures";
 import type { FileRow } from "@/ipc/types";
 
-function renderThumb(file: FileRow): ReturnType<typeof render> {
+function renderThumb(
+  file: FileRow,
+  fit?: "cover" | "contain",
+): ReturnType<typeof render> {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui: ReactElement = (
     <QueryClientProvider client={qc}>
@@ -26,6 +29,7 @@ function renderThumb(file: FileRow): ReturnType<typeof render> {
             file={file}
             mediaBase="http://127.0.0.1:17345"
             version={0}
+            fit={fit}
           />
         </PreferencesProvider>
       </I18nProvider>
@@ -53,6 +57,14 @@ describe("MediaThumbnail", () => {
     expect(bar.getAttribute("aria-valuemin")).toBe("0");
     expect(bar.getAttribute("aria-valuemax")).toBe("100");
     expect(bar.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("covers its box by default and shows the whole image when asked to contain", () => {
+    const img = (fit?: "cover" | "contain") =>
+      renderThumb(sampleFileRow, fit).container.querySelector("img")!.className;
+    expect(img()).toContain("object-cover");
+    expect(img("contain")).toContain("object-contain");
+    expect(img("contain")).not.toContain("object-cover");
   });
 
   it("shows no progress bar for a file with nothing to resume", () => {

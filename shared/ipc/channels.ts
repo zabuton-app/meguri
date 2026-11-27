@@ -4,8 +4,11 @@
 // Output is declared as TypeScript types rather than Zod schemas because the
 // renderer trusts data coming from main (no runtime check needed).
 import { z } from "zod";
+import type { DownloadOriginEntry } from "../downloadOrigin.js";
+import type { SubtitleCue } from "../embeddedSubtitles.js";
 import type {
   AppStatus,
+  CrashReport,
   DuplicatesResult,
   FileDetail,
   FileRow,
@@ -13,8 +16,10 @@ import type {
   FolderListing,
   HistoryPage,
   LogoId,
+  MissingFilesResult,
   SceneBookmark,
   SearchResult,
+  StoredSmartCollections,
   TagList,
   UpdateInfo,
   UserCollection,
@@ -32,7 +37,9 @@ import {
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
+  SmartCollectionSchema,
   AutoTagConfigSchema,
+  ExclusionPatternSchema,
   TagRefSchema,
 } from "./schema.js";
 import {
@@ -66,8 +73,13 @@ import {
 import { ACTIVITY_MAX_DAYS, type ActivityDays } from "./activity.js";
 import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
-import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
+import { MAX_FOLDER_FILES_PATHS, ROOT_FOLDER } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
+import {
+  MAX_EXCLUDED_FOLDERS,
+  MAX_EXCLUSION_PATTERNS,
+  type ExclusionPattern,
+} from "../scanExclusions.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
 export type { EventChannel, InvokeChannel };
@@ -305,8 +317,8 @@ export const ChannelInputs = {
   collection_rename: z.object({ id: z.string(), name: z.string().min(1) }),
   collection_add_file: FileTarget.extend({ collectionId: z.string() }),
   collection_remove_file: FileTarget.extend({ collectionId: z.string() }),
-  // Membership for many files at once. Collections live in config.json, which is
-  // rewritten on every change, so adding a selection one file at a time would
+  // Membership for many files at once. Each collection change is its own
+  // transaction, synced to disk, so adding a selection one file at a time would
   // mean one disk write per file. `op` names the direction rather than a boolean
   // flag, matching the collection_add_file / collection_remove_file vocabulary
   // this is the bulk form of.
@@ -315,6 +327,16 @@ export const ChannelInputs = {
     targets: BulkTargets,
     op: z.enum(["add", "remove"]),
   }),
+  smart_collections_list: z.void(),
+  // What an earlier version kept in the renderer's localStorage, moved in
+  // once (see smartCollectionStore.ts).
+  smart_collections_import: z.object({
+    collections: z.array(SmartCollectionSchema),
+    defaultId: z.string().nullable(),
+  }),
+  smart_collection_add: z.object({ collection: SmartCollectionSchema }),
+  smart_collection_remove: z.object({ id: z.string() }),
+  smart_collection_set_default: z.object({ id: z.string().nullable() }),
   // Renderer always sends an object; default-{} makes the schema tolerant of
   // future call sites that omit the arg entirely.
   scan_start: z
@@ -390,6 +412,11 @@ export const ChannelInputs = {
     axis: TimelineAxisSchema,
   }),
   file_get: FileTarget,
+  file_download_origin: FileTarget,
+  file_subtitles: FileTarget.extend({
+    track: z.number().int().nonnegative(),
+    windowStart: z.number().int().nonnegative().max(31_536_000),
+  }),
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
   // The whole note as Markdown; null (or text that is only whitespace) removes it.
@@ -420,6 +447,8 @@ export const ChannelInputs = {
   }),
   history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
   duplicates_list: z.void(),
+  missing_files_list: z.void(),
+  missing_files_purge: z.object({ targets: BulkTargets }),
   history_clear: z.void(),
   // A name being created, so it is capped at MAX_TAG_NAME — same as
   // tag_rename's `to`, and unlike TagRefSchema, which only addresses one.
@@ -515,12 +544,31 @@ export const ChannelInputs = {
   open_url: z.object({ url: z.string() }),
   open_devtools: z.void(),
   window_close: z.void(),
+  window_minimize: z.void(),
+  window_toggle_maximize: z.void(),
+  window_state: z.void(),
+  // A double click on the custom title bar, on macOS only: there the drag
+  // region still gets the click, and main applies the system's choice.
+  window_title_bar_double_click: z.void(),
+  // Where the title bar leaves room for macOS's traffic lights, in the
+  // window's coordinates (macOS only; elsewhere the call does nothing).
+  window_set_button_position: z.object({
+    x: z.number().int().min(0).max(100_000),
+    y: z.number().int().min(0).max(100_000),
+  }),
+  // Shows or hides macOS's traffic lights (macOS only; elsewhere the title
+  // bar draws its own buttons, or none).
+  window_set_button_visibility: z.boolean(),
   // Update check (GitHub Releases). `force` bypasses the throttle used by the
   // background/startup check (manual "check now" button always hits the network).
   update_check: z.object({ force: z.boolean().optional() }).default({}),
   update_get_settings: z.void(),
   update_set_auto_check: z.object({ enabled: z.boolean() }),
   update_ignore: z.object({ version: z.string() }),
+  crash_reports_list: z.void(),
+  // Report ids are the detection time in ms (crashReports.ts).
+  crash_report_delete: z.object({ id: z.string().regex(/^\d+$/) }),
+  crash_reports_open_folder: z.void(),
   auto_tag_get: z.void(),
   auto_tag_set: z.object({ config: AutoTagConfigSchema }),
   auto_tag_files: z.void(),
@@ -549,6 +597,39 @@ export const ChannelInputs = {
   auto_tag_reapply: z.void(),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
+  logo_images: z.void(),
+  scan_exclusions_get: z.void(),
+  // Each pattern must compile (patternError); main checks again on save.
+  scan_exclusions_set_patterns: z.object({
+    patterns: z.array(ExclusionPatternSchema).max(MAX_EXCLUSION_PATTERNS),
+  }),
+  scan_exclusions_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Not the root: that would leave nothing to scan.
+  scan_exclusions_add_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    path: FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+      message: "the workspace root cannot be excluded",
+    }),
+  }),
+  // Both in one save: the edit dialog's staged changes all go, or none do.
+  scan_exclusions_update_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    add: z
+      .array(
+        FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+          message: "the workspace root cannot be excluded",
+        }),
+      )
+      .max(MAX_EXCLUDED_FOLDERS),
+    remove: z.array(FolderPathSchema).max(MAX_EXCLUDED_FOLDERS),
+  }),
+  scan_exclusions_pick_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Must compile (patternError); main checks.
+  scan_exclusions_preview: z.object({ pattern: ExclusionPatternSchema }),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -631,6 +712,12 @@ export interface ChannelOutputs {
   collection_remove_file: void;
   /** Files whose membership actually changed (already-members are not counted). */
   collection_set_membership: { changed: number };
+  /** `needsImport` until localStorage's have been moved in (smart_collections_import). */
+  smart_collections_list: StoredSmartCollections & { needsImport: boolean };
+  smart_collections_import: StoredSmartCollections;
+  smart_collection_add: StoredSmartCollections;
+  smart_collection_remove: StoredSmartCollections;
+  smart_collection_set_default: StoredSmartCollections;
   scan_start: string;
   scan_cancel: void;
   /** Workspaces whose last scan could not read their folder (#313). */
@@ -646,6 +733,8 @@ export interface ChannelOutputs {
   activity_days: ActivityDays;
   timeline_counts: TimelineCounts;
   file_get: FileDetail | null;
+  file_download_origin: DownloadOriginEntry[];
+  file_subtitles: SubtitleCue[];
   file_set_rating: void;
   file_set_favorite: void;
   file_set_note: void;
@@ -654,6 +743,10 @@ export interface ChannelOutputs {
   file_save_position: void;
   history_list: HistoryPage;
   duplicates_list: DuplicatesResult;
+  missing_files_list: MissingFilesResult;
+  /** How many files were removed: ones that came back, and every file of a
+   *  workspace being scanned, are skipped. */
+  missing_files_purge: { removed: number };
   history_clear: void;
   file_add_tag: number;
   file_remove_tag: void;
@@ -701,11 +794,20 @@ export interface ChannelOutputs {
   open_url: void;
   open_devtools: boolean;
   window_close: void;
+  window_minimize: void;
+  window_toggle_maximize: void;
+  window_state: WindowState;
+  window_title_bar_double_click: void;
+  window_set_button_position: void;
+  window_set_button_visibility: void;
   // null when the check could not reach GitHub (offline / rate-limited).
   update_check: UpdateInfo | null;
   update_get_settings: UpdateSettings;
   update_set_auto_check: void;
   update_ignore: void;
+  crash_reports_list: CrashReport[];
+  crash_report_delete: void;
+  crash_reports_open_folder: void;
   auto_tag_get: AutoTagConfig;
   auto_tag_set: void;
   // Files of every workspace (a sample when there are more than the cap).
@@ -728,6 +830,24 @@ export interface ChannelOutputs {
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;
+  // The in-app logo of each variant, as a data URL. The bitmaps come from
+  // startApp()'s options, so the renderer cannot bundle them.
+  logo_images: Record<LogoId, string>;
+  scan_exclusions_get: ScanExclusionsState;
+  // Returns the state saved; the files the new patterns cover are hidden by
+  // the time it does.
+  scan_exclusions_set_patterns: ScanExclusionsState;
+  scan_exclusions_folders: ExcludedFolders;
+  // Returns the folders saved; the files the new one holds are hidden by the
+  // time it does.
+  scan_exclusions_add_folder: ExcludedFolders;
+  // Returns the folders saved. What the added ones hold is hidden by the time
+  // it does; the files of the removed ones come back at the next scan.
+  scan_exclusions_update_folders: ExcludedFolders;
+  // Only picks: the folder is excluded when the renderer adds it.
+  scan_exclusions_pick_folder: PickedFolder;
+  // What a pattern would hide, before it is saved; nothing is written.
+  scan_exclusions_preview: PatternPreview;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.
@@ -765,13 +885,64 @@ export interface AboutInfo {
   node: string;
 }
 
-/** User-facing update preferences (persisted in main's config.json). */
+/** User-facing update preferences (persisted in main's settings). */
 export interface UpdateSettings {
   /** Whether the app checks for updates on startup. */
   autoCheck: boolean;
   /** Version the user chose to skip ("don't notify me about this one"), if any. */
   ignoredVersion: string | null;
 }
+/** The scan exclusions (#282) the settings screen edits. */
+export interface ScanExclusionsState {
+  /** The patterns for every workspace. */
+  patterns: ExclusionPattern[];
+}
+
+/**
+ * A folder the user picked to exclude: one inside the workspace, or why
+ * there is none. "outside" is also the workspace root itself.
+ */
+export type PickedFolder =
+  | { status: "picked"; path: string; absPath: string }
+  | { status: "canceled" }
+  | { status: "outside" };
+
+/**
+ * The listed files a pattern covers in every workspace: how many, and the
+ * first of them. "timedOut" when the pattern did not finish in the worker.
+ * Two workspaces where one holds the other count a file in both twice.
+ */
+export type PatternPreview =
+  | {
+      status: "done";
+      total: number;
+      files: {
+        /** The workspace's folder name. */
+        workspace: string;
+        /** Relative to the workspace root, "/"-separated. */
+        path: string;
+        absPath: string;
+      }[];
+    }
+  | { status: "timedOut" }
+  /** A newer preview was asked for before this one was through. */
+  | { status: "superseded" };
+
+/** The folders a workspace's scans leave out. */
+export interface ExcludedFolders {
+  folders: {
+    /** Relative to the workspace root, "/"-separated. */
+    path: string;
+    /**
+     * The folder on disk, in the OS's form: what is shown, since the path
+     * alone reads like any folder of that name, which it does not cover.
+     */
+    absPath: string;
+    /** Whether it is a folder on disk now: false once it is renamed or gone. */
+    found: boolean;
+  }[];
+}
+
 /** The user stylesheet: whether it is on, where it lives, and what it holds. */
 export interface CustomCssState {
   enabled: boolean;
@@ -799,6 +970,13 @@ export interface CssThemesState {
   css: string | null;
   /** Absolute path of the themes folder. */
   dir: string;
+}
+
+/** The main window's state the custom title bar draws from (window_state,
+ *  and the window:state event whenever it changes). */
+export interface WindowState {
+  maximized: boolean;
+  fullScreen: boolean;
 }
 
 /** Payload of the custom-css:changed event. */

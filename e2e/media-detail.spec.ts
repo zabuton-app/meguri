@@ -88,7 +88,7 @@ test.describe("Media detail", () => {
 
   test("list stays mounted under detail modal", async ({ ready }) => {
     await openFileDetail(ready);
-    await expect(ready.locator("#list-search-input")).toBeVisible();
+    await expect(ready.locator('[data-slot="search-trigger"]')).toBeVisible();
     await expect(
       ready.getByRole("contentinfo", { name: "Status bar" }),
     ).toBeVisible();

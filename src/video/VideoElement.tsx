@@ -22,6 +22,7 @@ export interface VideoElementHandlers {
   onEnded?: () => void;
   onVolumeChange?: () => void;
   onLoadedMetadata?: () => void;
+  onLoadedData?: () => void;
   onTimeUpdate?: () => void;
   onSeeked?: () => void;
   onError?: () => void;
@@ -34,6 +35,7 @@ const EVENT_NAMES: Record<keyof VideoElementHandlers, string> = {
   onEnded: "ended",
   onVolumeChange: "volumechange",
   onLoadedMetadata: "loadedmetadata",
+  onLoadedData: "loadeddata",
   onTimeUpdate: "timeupdate",
   onSeeked: "seeked",
   onError: "error",
@@ -134,6 +136,8 @@ export function VideoElement({
       if (!el) {
         el = document.createElement("video");
         el.autoplay = autoPlay;
+        // The loopback media server permits cross-origin video texture uploads.
+        el.crossOrigin = "anonymous";
         // Never an empty `src` attribute: unlike React (which drops the
         // attribute for ""), assigning "" starts a load that fails with
         // MEDIA_ERR_SRC_NOT_SUPPORTED — fatal to the player.

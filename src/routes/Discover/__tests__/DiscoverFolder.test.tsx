@@ -17,7 +17,7 @@ vi.mock("@/ipc/client", () => ({
     workspacesList: () => Promise.resolve(defaultWorkspacesList),
     filesRandom: (query: unknown) => mocks.filesRandom(query),
   },
-  events: { onThumbDone: vi.fn().mockResolvedValue(() => {}) },
+  events: { onThumbDone: vi.fn().mockReturnValue(() => {}) },
   ALL_ID: "__all__",
 }));
 

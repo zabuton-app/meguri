@@ -1,15 +1,18 @@
 // Regression tests for search/filter/sort and durable-metadata operations in queries.ts.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
+import type { SearchQuery } from "../types.js";
 import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import {
   addBookmark,
+  attachBookmarkSecs,
   deleteFromIndex,
   fileDetail,
   filesByIds,
   listBookmarks,
   migrateMetaKey,
   pruneUnusedTags,
+  RARE_TAG_ROWS,
   randomFiles,
   removeBookmark,
   searchFiles,
@@ -49,15 +52,75 @@ describe("searchFiles", () => {
     setFavorite(db, vid, true);
     setRating(db, img, 4);
 
-    expect(searchFiles(db, { kind: "image" }).items.map((f) => f.id)).toEqual([
-      img,
-    ]);
+    expect(
+      searchFiles(db, { kinds: ["image"] }).items.map((f) => f.id),
+    ).toEqual([img]);
     expect(searchFiles(db, { favorite: true }).items.map((f) => f.id)).toEqual([
       vid,
     ]);
     expect(searchFiles(db, { ratingMin: 3 }).items.map((f) => f.id)).toEqual([
       img,
     ]);
+  });
+
+  it("filters to videos with an embedded text subtitle track (#378)", () => {
+    const withMeta = (
+      relPath: string,
+      kind: "video" | "audio",
+      streams: unknown[],
+    ) => {
+      const id = insertFile(db, rootId, { relPath, kind });
+      db.prepare("UPDATE files SET meta = ? WHERE id = ?").run(
+        JSON.stringify({ streams }),
+        id,
+      );
+      return id;
+    };
+    const video = { codec_type: "video", codec_name: "h264" };
+    const srt = withMeta("srt.mkv", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "subrip" },
+    ]);
+    const movText = withMeta("tx3g.mp4", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "mov_text" },
+    ]);
+    // Bitmap subtitles: the player cannot show them, so they do not count.
+    withMeta("pgs.mkv", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "hdmv_pgs_subtitle" },
+    ]);
+    withMeta("plain.mp4", "video", [video]);
+    // The word alone, outside a subtitle stream, is not a subtitle track.
+    withMeta("titled.mp4", "video", [
+      { ...video, tags: { title: "subtitle" } },
+    ]);
+    // An audio file is not a video, whatever its streams say.
+    withMeta("lyrics.mka", "audio", [
+      { codec_type: "audio", codec_name: "flac" },
+      { codec_type: "subtitle", codec_name: "ass" },
+    ]);
+    insertFile(db, rootId, { relPath: "unprobed.mp4" });
+
+    const ids = searchFiles(db, { subtitles: true, limit: 100 })
+      .items.map((f) => f.id)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([srt, movText]);
+  });
+
+  it("filters by any of several kinds, and by every kind when none is given", () => {
+    const vid = insertFile(db, rootId, { relPath: "a.mp4", kind: "video" });
+    const img = insertFile(db, rootId, { relPath: "b.jpg", kind: "image" });
+    const aud = insertFile(db, rootId, { relPath: "c.mp3", kind: "audio" });
+    const ids = (kinds?: string[]) =>
+      searchFiles(db, { kinds, limit: 100 })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+
+    expect(ids(["video"])).toEqual([vid]);
+    expect(ids(["video", "audio"])).toEqual([vid, aud]);
+    expect(ids([])).toEqual([vid, img, aud]);
+    expect(ids(undefined)).toEqual([vid, img, aud]);
   });
 
   it("reports hasThumb from thumb_path, not from thumb_status", () => {
@@ -229,12 +292,339 @@ describe("searchFiles", () => {
     ).toEqual([old, mid, none]);
   });
 
+  it("sorts names in natural order, through every page (#292)", () => {
+    for (const name of [
+      "Ep10.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+      "ep11.mp4",
+      "Ep3.mp4",
+    ])
+      insertFile(db, rootId, { relPath: name });
+    const names = (sortDir: "asc" | "desc") => {
+      const out: string[] = [];
+      let cursor: SearchQuery["cursor"];
+      do {
+        const page = searchFiles(db, {
+          sort: "name",
+          sortDir,
+          limit: 2,
+          cursor,
+        });
+        out.push(...page.items.map((f) => f.relPath));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor != null);
+      return out;
+    };
+    expect(names("asc")).toEqual([
+      "Ep1.mp4",
+      "ep2.mp4",
+      "Ep3.mp4",
+      "Ep10.mp4",
+      "ep11.mp4",
+    ]);
+    expect(names("desc")).toEqual([
+      "ep11.mp4",
+      "Ep10.mp4",
+      "Ep3.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+    ]);
+  });
+
   it("matches the full-text query against rel_path after FTS sync", () => {
     const hit = insertFile(db, rootId, { relPath: "holiday/beach.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });
     syncFts(db, hit);
     const res = searchFiles(db, { q: "beach" });
     expect(res.items.map((f) => f.id)).toEqual([hit]);
+  });
+
+  it("finds files by a content hash prefix with hash: (#302)", () => {
+    const a = insertFile(db, rootId, {
+      relPath: "a.mp4",
+      contentHash: "3fa9c1d2" + "0".repeat(56),
+    });
+    const b = insertFile(db, rootId, {
+      relPath: "b.mp4",
+      contentHash: "3fa9c1d2" + "1".repeat(56),
+    });
+    insertFile(db, rootId, {
+      relPath: "c.mp4",
+      contentHash: "3fa9ffff" + "0".repeat(56),
+    });
+    // No hash yet: never matches.
+    insertFile(db, rootId, { relPath: "d.mp4", contentHash: null });
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("hash:3FA9C1D2")).toEqual([a, b]);
+    expect(ids(`hash:3fa9c1d2${"0".repeat(56)}`)).toEqual([a]);
+    expect(ids("hash:ffff")).toEqual([]);
+  });
+
+  it("finds files by extension with ext: (#522)", () => {
+    const mp4 = insertFile(db, rootId, { relPath: "clip.mp4" });
+    insertFile(db, rootId, { relPath: "clip.m4v" });
+    // A folder name containing the text is not an extension match.
+    insertFile(db, rootId, { relPath: "mp4_backup/clip.mov" });
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("ext:mp4")).toEqual([mp4]);
+    expect(ids("ext:MP4")).toEqual([mp4]);
+    expect(ids("ext:.mp4")).toEqual([mp4]);
+    expect(ids("ext: mp4")).toEqual([mp4]);
+    expect(ids("ext:mkv")).toEqual([]);
+  });
+
+  describe("numeric directives (#524)", () => {
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+
+    it("compares size with each operator, in binary units", () => {
+      const small = insertFile(db, rootId, { relPath: "a.mp4", size: 1024 });
+      const mid = insertFile(db, rootId, { relPath: "b.mp4", size: 1024 ** 2 });
+      const big = insertFile(db, rootId, { relPath: "c.mp4", size: 1024 ** 3 });
+      expect(ids("size:>1mb")).toEqual([big]);
+      expect(ids("size:>=1mb")).toEqual([mid, big]);
+      expect(ids("size:<1mb")).toEqual([small]);
+      expect(ids("size:<=1mb")).toEqual([small, mid]);
+      expect(ids("size:1mb")).toEqual([mid]);
+      expect(ids("size:1kb")).toEqual([small]);
+    });
+
+    it("ANDs two directives on one field into a range", () => {
+      insertFile(db, rootId, { relPath: "a.mp4", size: 50 * 1024 ** 2 });
+      const mid = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        size: 500 * 1024 ** 2,
+      });
+      insertFile(db, rootId, { relPath: "c.mp4", size: 2 * 1024 ** 3 });
+      expect(ids("size:>100mb size:<1gb")).toEqual([mid]);
+      expect(ids("size: >100mb size: <1gb")).toEqual([mid]);
+    });
+
+    it("compares duration in whole seconds, and never matches an unknown one", () => {
+      const short = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        duration: 29.9,
+      });
+      const clip = insertFile(db, rootId, { relPath: "b.mp4", duration: 90.4 });
+      const long = insertFile(db, rootId, {
+        relPath: "c.mp4",
+        duration: 3723,
+      });
+      insertFile(db, rootId, { relPath: "d.jpg", kind: "image" });
+      expect(ids("duration:<30s")).toEqual([short]);
+      expect(ids("duration:1:30")).toEqual([clip]);
+      expect(ids("duration:90")).toEqual([clip]);
+      expect(ids("duration:>20m")).toEqual([long]);
+      expect(ids("duration:>=1:02:03")).toEqual([long]);
+      expect(ids("duration:<=1h")).toEqual([short, clip]);
+      // 90.4 s is 90 in whole seconds, so it is not over 90.
+      expect(ids("duration:>90s")).toEqual([long]);
+    });
+
+    it("compares width and height in pixels", () => {
+      const uhd = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        width: 3840,
+        height: 2160,
+      });
+      const hd = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        width: 1920,
+        height: 1080,
+      });
+      insertFile(db, rootId, { relPath: "c.mp3", kind: "audio" });
+      expect(ids("width:>=3840")).toEqual([uhd]);
+      expect(ids("height:1080")).toEqual([hd]);
+      expect(ids("height:<2160")).toEqual([hd]);
+    });
+
+    it("excludes with a leading -, keeping a file whose value is unknown", () => {
+      const short = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        duration: 20,
+        size: 1024,
+      });
+      const long = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        duration: 600,
+        size: 1024 ** 3,
+      });
+      const image = insertFile(db, rootId, { relPath: "c.jpg", kind: "image" });
+      expect(ids("-duration:<30s")).toEqual([long, image]);
+      expect(ids("-size:>1mb")).toEqual([short, image]);
+      expect(ids("duration:>10s -duration:>5m")).toEqual([short]);
+    });
+
+    it("leaves an unparsable value as free text", () => {
+      // Searched as the text it is, so it finds a name that contains it.
+      const named = insertFile(db, rootId, { relPath: "size:big.mp4" });
+      insertFile(db, rootId, { relPath: "other.mp4", size: 2 * 1024 ** 3 });
+      syncFts(db, named);
+      expect(ids("size:big")).toEqual([named]);
+    });
+  });
+
+  describe("a leading - excludes (#523)", () => {
+    const ids = (q: string) =>
+      searchFiles(db, { q })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+
+    it("excludes by hash prefix, keeping files without a hash", () => {
+      const a = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        contentHash: "3fa9c1d2" + "0".repeat(56),
+      });
+      const b = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        contentHash: "3fa9ffff" + "0".repeat(56),
+      });
+      const c = insertFile(db, rootId, { relPath: "c.mp4", contentHash: null });
+      expect(ids("-hash:3FA9C1")).toEqual([b, c]);
+      expect(ids("-hash:3fa9")).toEqual([c]);
+      expect(ids("hash:3fa9 -hash:3fa9c1")).toEqual([b]);
+      expect(ids("-hash:ffff")).toEqual([a, b, c]);
+    });
+
+    it("excludes by extension", () => {
+      const mp4 = insertFile(db, rootId, { relPath: "a.mp4" });
+      const gif = insertFile(db, rootId, { relPath: "b.gif", ext: "gif" });
+      const mov = insertFile(db, rootId, { relPath: "c.mov", ext: "mov" });
+      expect(ids("-ext:GIF")).toEqual([mp4, mov]);
+      expect(ids("-ext:.gif -ext:mov")).toEqual([mp4]);
+      expect(ids("-ext:mkv")).toEqual([mp4, gif, mov]);
+      expect(ids("ext:gif -ext:gif")).toEqual([]);
+    });
+
+    it("excludes free text through the index and through LIKE", () => {
+      const draft = insertFile(db, rootId, { relPath: "trip/draft_cut.mp4" });
+      const final = insertFile(db, rootId, { relPath: "trip/final.mp4" });
+      const ab = insertFile(db, rootId, { relPath: "ab/clip.mp4" });
+      for (const id of [draft, final, ab]) syncFts(db, id);
+      // 3+ code points: the trigram index.
+      expect(ids("-draft")).toEqual([final, ab]);
+      expect(ids("trip -draft")).toEqual([final]);
+      expect(ids("-DRAFT")).toEqual([final, ab]);
+      // Shorter: LIKE.
+      expect(ids("-ab")).toEqual([draft, final]);
+      // Alternatives: a file matching any of them is left out.
+      expect(ids("-draft|ab")).toEqual([final]);
+      // Each negated word excludes on its own, not only together.
+      expect(ids("-draft -final")).toEqual([ab]);
+    });
+
+    it("excludes by a user's tag, in the path or the tags", () => {
+      const tagged = insertFile(db, rootId, { relPath: "a.mp4" });
+      const plain = insertFile(db, rootId, { relPath: "b.mp4" });
+      addManualTag(db, tagged, "screenshot");
+      for (const id of [tagged, plain]) syncFts(db, id);
+      expect(ids("-screenshot")).toEqual([plain]);
+      expect(ids("-tag:screenshot")).toEqual([plain]);
+      // No such tag: nothing to leave out.
+      expect(ids("-tag:nope")).toEqual([tagged, plain]);
+    });
+
+    it("searches a quoted leading - as text, and a lone - as text", () => {
+      const intro = insertFile(db, rootId, { relPath: "-intro.mp4" });
+      const other = insertFile(db, rootId, { relPath: "intro.mp4" });
+      const dash = insertFile(db, rootId, { relPath: "a - b.mp4" });
+      for (const id of [intro, other, dash]) syncFts(db, id);
+      expect(ids('"-intro"')).toEqual([intro]);
+      expect(ids("-intro")).toEqual([dash]);
+      expect(ids("-")).toEqual([intro, dash]);
+    });
+  });
+
+  it("finds files by rating with rating:, an unrated file counting as 0 (#525)", () => {
+    const none = insertFile(db, rootId, { relPath: "a.mp4" });
+    const two = insertFile(db, rootId, { relPath: "b.mp4" });
+    const four = insertFile(db, rootId, { relPath: "c.mp4" });
+    const five = insertFile(db, rootId, { relPath: "d.mp4" });
+    setRating(db, two, 2);
+    setRating(db, four, 4);
+    setRating(db, five, 5);
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("rating:4")).toEqual([four]);
+    expect(ids("rating:0")).toEqual([none]);
+    expect(ids("rating:>4")).toEqual([five]);
+    expect(ids("rating:>=4")).toEqual([four, five]);
+    expect(ids("rating:<2")).toEqual([none]);
+    expect(ids("rating:<=2")).toEqual([none, two]);
+    expect(ids("RATING: >=4")).toEqual([four, five]);
+    // Ranges combine: each directive is one more condition.
+    expect(ids("rating:>=2 rating:<5")).toEqual([two, four]);
+  });
+
+  it("leaves a rating: outside 0 to 5 as ordinary text (#525)", () => {
+    const hit = insertFile(db, rootId, { relPath: "rating:6.mp4" });
+    syncFts(db, hit);
+    const rated = insertFile(db, rootId, { relPath: "b.mp4" });
+    setRating(db, rated, 5);
+    const ids = (q: string) => searchFiles(db, { q }).items.map((f) => f.id);
+    expect(ids("rating:6")).toEqual([hit]);
+    expect(ids("rating:>=-1")).toEqual([]);
+    expect(ids("rating:=>3")).toEqual([]);
+    expect(ids("rating:3.5")).toEqual([]);
+  });
+
+  it("finds favorites with is:fav (#525)", () => {
+    const fav = insertFile(db, rootId, { relPath: "a.mp4" });
+    insertFile(db, rootId, { relPath: "b.mp4" });
+    const other = insertFile(db, rootId, { relPath: "is:favorite.mp4" });
+    syncFts(db, other);
+    setFavorite(db, fav, true);
+    const ids = (q: string) => searchFiles(db, { q }).items.map((f) => f.id);
+    expect(ids("is:fav")).toEqual([fav]);
+    expect(ids("IS: Fav")).toEqual([fav]);
+    // Any other value is ordinary text.
+    expect(ids("is:favorite")).toEqual([other]);
+  });
+
+  it("ANDs rating: and is:fav with the rating and favorite controls (#525)", () => {
+    const favFour = insertFile(db, rootId, { relPath: "a.mp4" });
+    const favTwo = insertFile(db, rootId, { relPath: "b.mp4" });
+    const four = insertFile(db, rootId, { relPath: "c.mp4" });
+    setFavorite(db, favFour, true);
+    setFavorite(db, favTwo, true);
+    setRating(db, favFour, 4);
+    setRating(db, favTwo, 2);
+    setRating(db, four, 4);
+    const ids = (query: SearchQuery) =>
+      searchFiles(db, { ...query, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids({ q: "is:fav", ratingMin: 3 })).toEqual([favFour]);
+    expect(ids({ q: "rating:>=4", favorite: true })).toEqual([favFour]);
+    // Both apply: the box asks for at most 2, the control for at least 3.
+    expect(ids({ q: "rating:<=2", ratingMin: 3 })).toEqual([]);
+    expect(ids({ q: "rating:>=2", ratingMin: 4 })).toEqual([favFour, four]);
+  });
+
+  it("excludes by rating and favorite with a leading - (#525)", () => {
+    const fav = insertFile(db, rootId, { relPath: "a.mp4" });
+    const four = insertFile(db, rootId, { relPath: "b.mp4" });
+    // No file_meta row at all: neither a favorite nor rated.
+    const plain = insertFile(db, rootId, { relPath: "c.mp4" });
+    setFavorite(db, fav, true);
+    setRating(db, four, 4);
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("-is:fav")).toEqual([four, plain]);
+    expect(ids("-rating:>=4")).toEqual([fav, plain]);
   });
 
   it("matches a substring in the middle of a word (trigram)", () => {
@@ -374,7 +764,7 @@ describe("randomFiles", () => {
     for (let i = 0; i < 5; i++)
       insertFile(db, rootId, { relPath: `v${i}.mp4`, kind: "video" });
     insertFile(db, rootId, { relPath: "p.jpg", kind: "image" });
-    const out = randomFiles(db, { kind: "video", limit: 3 });
+    const out = randomFiles(db, { kinds: ["video"], limit: 3 });
     expect(out.length).toBe(3);
     expect(out.every((f) => f.kind === "video")).toBe(true);
     db.close();
@@ -395,7 +785,7 @@ describe("randomFiles", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
     insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
-    const out = randomFiles(db, { kind: "audio", limit: 10 });
+    const out = randomFiles(db, { kinds: ["audio"], limit: 10 });
     expect(out.length).toBe(1);
     expect(out[0].kind).toBe("audio");
     db.close();
@@ -419,6 +809,51 @@ describe("attachTags", () => {
         ?.tags.map((t) => `${t.namespace}:${t.name}`)
         .sort(),
     ).toEqual([":beach", "res:4k"]);
+    db.close();
+  });
+});
+
+describe("filmstrip row details", () => {
+  it("search rows carry codec and fps", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4", codec: "h264" });
+    db.prepare("UPDATE files SET fps = 29.97 WHERE id = ?").run(id);
+    const row = searchFiles(db, {}).items[0];
+    expect(row.codec).toBe("h264");
+    expect(row.fps).toBe(29.97);
+    db.close();
+  });
+
+  it("fileDetail carries codec and fps, selected once with the row's columns", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4", codec: "hevc" });
+    db.prepare("UPDATE files SET fps = 23.976 WHERE id = ?").run(id);
+    const d = fileDetail(db, id);
+    expect(d?.codec).toBe("hevc");
+    expect(d?.fps).toBe(23.976);
+    db.close();
+  });
+
+  it("attachBookmarkSecs attaches each file's bookmark seconds in order", () => {
+    const { db, rootId } = newDb();
+    const a = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
+    const b = insertFile(db, rootId, { relPath: "b.mp4", contentHash: "hb" });
+    addBookmark(db, a, 30);
+    addBookmark(db, a, 5);
+    const rows = filesByIds(db, [a, b]);
+    attachBookmarkSecs(db, rows);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(a)?.bookmarkSecs).toEqual([5, 30]);
+    expect(byId.get(b)?.bookmarkSecs).toEqual([]);
+    db.close();
+  });
+
+  it("search rows carry bookmarkSecs", () => {
+    const { db, rootId } = newDb();
+    const a = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
+    addBookmark(db, a, 30);
+    addBookmark(db, a, 5);
+    expect(searchFiles(db, {}).items[0].bookmarkSecs).toEqual([5, 30]);
     db.close();
   });
 });
@@ -482,10 +917,13 @@ describe("structured tag filtering", () => {
   });
 
   it("still honours tagSource across every token", () => {
+    // The same tag from another source, on a file of its own.
+    const manualRes = insertFile(db, rootId, { relPath: "manual-res.mp4" });
+    addFileTag(db, manualRes, upsertTag(db, "res", "4k"), "manual", null);
     expect(ids(["res:4k"], "auto-meta")).toEqual(
       [autoOnly, both].sort((a, b) => a - b),
     );
-    expect(ids(["res:4k"], "manual")).toEqual([]);
+    expect(ids(["res:4k"], "manual")).toEqual([manualRes]);
   });
 
   describe("the tag: free-text directive", () => {
@@ -523,6 +961,34 @@ describe("structured tag filtering", () => {
       syncFts(db, plain);
       expect(q("tag:4k")).toContain(plain);
       expect(q("tag:res:4k")).not.toContain(plain);
+    });
+
+    it("reaches an audio tag only by its namespace, so a manual tag of that name does not bring it (#468)", () => {
+      const song = insertFile(db, rootId, { relPath: "song.mp3" });
+      addFileTag(
+        db,
+        song,
+        upsertTag(db, "audio_genre", "jazz"),
+        "auto-meta",
+        null,
+      );
+      addFileTag(
+        db,
+        song,
+        upsertTag(db, "audio_tempo", "slow"),
+        "auto-meta",
+        null,
+      );
+      const clip = insertFile(db, rootId, { relPath: "clip.mp4" });
+      addManualTag(db, clip, "jazz");
+      addManualTag(db, clip, "slow");
+      syncFts(db, song);
+      syncFts(db, clip);
+
+      expect(q("tag:jazz")).toEqual([clip]);
+      expect(q("tag:slow")).toEqual([clip]);
+      expect(q("tag:audio_genre:jazz")).toEqual([song]);
+      expect(q("tag:audio_tempo:slow")).toEqual([song]);
     });
 
     it("is case-insensitive on both the prefix and the value", () => {
@@ -567,6 +1033,59 @@ describe("structured tag filtering", () => {
 
     it("returns nothing for an unknown tag", () => {
       expect(q("tag:nope")).toEqual([]);
+    });
+  });
+
+  it("leaves out a deleted file that carries the tag", () => {
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(both);
+    expect(ids(["beach"])).toEqual([manualOnly]);
+    expect(searchFiles(db, { q: "tag:beach" }).items.map((f) => f.id)).toEqual([
+      manualOnly,
+    ]);
+  });
+
+  // Past RARE_TAG_ROWS rows, a tag is checked per file rather than
+  // collected from its rows (#365). The rows added here belong to no file in
+  // this workspace, as another workspace's would, so the answers stay the same.
+  describe("tags common enough to check per file", () => {
+    beforeEach(() => {
+      const add = db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, ?)",
+      );
+      const beach = db
+        .prepare("SELECT id FROM tags WHERE namespace = '' AND name = 'beach'")
+        .pluck()
+        .get() as number;
+      const res4k = upsertTag(db, "res", "4k");
+      for (let i = 0; i <= RARE_TAG_ROWS; i++) {
+        add.run(`elsewhere${i}`, beach, "manual");
+        add.run(`elsewhere${i}`, res4k, "auto-meta");
+      }
+    });
+
+    it("matches the same files as a rare tag", () => {
+      expect(ids(["beach"])).toEqual([manualOnly, both].sort((a, b) => a - b));
+      expect(ids(["beach", "res:4k"])).toEqual([both]);
+      expect(
+        searchFiles(db, { q: "tag:4k" })
+          .items.map((f) => f.id)
+          .sort((a, b) => a - b),
+      ).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("still honours tagSource", () => {
+      // The same tag from another source, on a file of its own.
+      const manualRes = insertFile(db, rootId, { relPath: "manual-res.mp4" });
+      addFileTag(db, manualRes, upsertTag(db, "res", "4k"), "manual", null);
+      expect(ids(["res:4k"], "auto-meta")).toEqual(
+        [autoOnly, both].sort((a, b) => a - b),
+      );
+      expect(ids(["res:4k"], "manual")).toEqual([manualRes]);
+    });
+
+    it("leaves out a deleted file that carries the tag", () => {
+      db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(both);
+      expect(ids(["beach"])).toEqual([manualOnly]);
     });
   });
 

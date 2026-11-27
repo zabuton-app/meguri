@@ -6,13 +6,30 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FFMPEG } from "../ffmpeg-paths.js";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import {
   coverArtStreamIndex,
   exportFrame,
   extractMeta,
   generateThumb,
 } from "../media.js";
+
+/** "width,height" of the first stream, as ffprobe reports it. */
+function sizeOf(file: string): string {
+  return execFileSync(
+    FFPROBE,
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=p=0",
+      file,
+    ],
+    { encoding: "utf8" },
+  ).trim();
+}
 
 let dir: string;
 let video: string;
@@ -353,6 +370,33 @@ describe("coverArtStreamIndex", () => {
     expect(coverArtStreamIndex(null)).toBeNull();
     expect(coverArtStreamIndex(undefined)).toBeNull();
     expect(coverArtStreamIndex({})).toBeNull();
+  });
+});
+
+describe("generateThumb (tiled HEIF)", () => {
+  it("scales the whole grid, not one tile", async () => {
+    const heic = fileURLToPath(
+      new URL("./fixtures/grid-1024x512.heic", import.meta.url),
+    );
+    const dest = path.join(dir, "grid.webp");
+    await expect(generateThumb(heic, "image", dest)).resolves.toBe(true);
+    // One 512x512 tile would come out square.
+    expect(sizeOf(dest)).toBe("480,240");
+  });
+});
+
+describe("generateThumb (selected video frame)", () => {
+  it("reports an empty seek and keeps the previous thumbnail intact", async () => {
+    const dest = path.join(dir, "selected.webp");
+    await expect(
+      generateThumb(video, "video", dest, undefined, 0.3),
+    ).resolves.toBe(true);
+    const original = fs.readFileSync(dest);
+
+    await expect(
+      generateThumb(video, "video", dest, undefined, 8),
+    ).resolves.toBe(false);
+    expect(fs.readFileSync(dest)).toEqual(original);
   });
 });
 

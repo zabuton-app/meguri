@@ -1,6 +1,9 @@
-// Metadata extraction (ffprobe) and thumbnail generation (ffmpeg). Bundled static binaries, no system dependency.
+// Metadata extraction (ffprobe) and thumbnail generation (ffmpeg), with the
+// bundled binaries or the system ones a package names (see ffmpeg-paths.ts).
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { promises as fsPromises } from "node:fs";
+import path from "node:path";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
 import { DECODE_FFMPEG_THREADS } from "./mediaConcurrency.js";
@@ -112,8 +115,12 @@ export async function extractMeta(
     const json = JSON.parse(stdout) as FfprobeOutput;
     const streams = json.streams ?? [];
     const wantAudio = kind === "audio";
+    // A video's embedded cover picture (attached_pic) can come before the
+    // picture itself; its codec and size describe the artwork.
     const v = streams.find((s) =>
-      wantAudio ? s.codec_type === "audio" : s.codec_type === "video",
+      wantAudio
+        ? s.codec_type === "audio"
+        : s.codec_type === "video" && s.disposition?.attached_pic !== 1,
     );
     const fmt = json.format ?? {};
     const tiled = kind === "image" && isTiledImage(streams);
@@ -146,11 +153,11 @@ export async function extractMeta(
   }
 }
 
-/** A HEIF/AVIF grid image (what phone cameras write): ffprobe 7 lists each tile
+/** A HEIF/AVIF grid image (what phone cameras write): ffprobe lists each tile
  *  (512x512 on an iPhone) as its own video stream, none marked default, and the
- *  full size only in a stream group, which 6.1 has no option to print. Its size
- *  is left unknown so the thumbnail pass treats it as a large image. A plain
- *  HEIF, and each stream of an animated AVIF, is marked default. */
+ *  full size only in a stream group, which this probe does not ask for. Its
+ *  size is left unknown so the thumbnail pass treats it as a large image. A
+ *  plain HEIF, and each stream of an animated AVIF, is marked default. */
 function isTiledImage(streams: FfprobeStream[]): boolean {
   const video = streams.filter((s) => s.codec_type === "video");
   return video.length > 1 && !video.some((s) => s.disposition?.default === 1);
@@ -163,7 +170,8 @@ let probeUnavailableWarned = false;
  *  install time, so a missing or wrong-arch binary (an unpinned cross build, or
  *  node_modules shared with a host of another arch) would otherwise leave every
  *  file's metadata null with nothing in the log. Only spawn errors (ENOENT, EACCES,
- *  ENOEXEC) count; a non-zero exit, a timeout or an abort is a per-file outcome. */
+ *  ENOEXEC) count; a non-zero exit, a timeout or an abort is a per-file outcome.
+ *  With MEGURI_FFMPEG_DIR set, it is how a missing system FFmpeg shows up. */
 function warnIfProbeUnavailable(err: unknown): void {
   if (probeUnavailableWarned) return;
   const e = err as NodeJS.ErrnoException | null;
@@ -194,6 +202,19 @@ export function coverArtStreamIndex(raw: unknown): number | null {
     (s) => s.codec_type === "video" && s.disposition?.attached_pic === 1,
   );
   return typeof cover?.index === "number" ? cover.index : null;
+}
+
+/** The codec a scan stores for a video (see extractMeta): its first video
+ *  stream's that is not a cover picture. Takes the already-probed JSON, like
+ *  coverArtStreamIndex. */
+export function videoCodecOf(raw: unknown): string | null {
+  const streams = (raw as FfprobeOutput | null)?.streams;
+  if (!Array.isArray(streams)) return null;
+  return (
+    streams.find(
+      (s) => s?.codec_type === "video" && s.disposition?.attached_pic !== 1,
+    )?.codec_name ?? null
+  );
 }
 
 // How many seconds of margin to leave when doing the coarse pre-input seek of the hybrid
@@ -330,16 +351,28 @@ async function runFfmpegFrameExport(
     return true;
   } catch (err) {
     if (!signal?.aborted) {
-      const stderr =
+      const stderr = withoutPaths(
         (err as { stderr?: string }).stderr ??
-        (err as Error).message ??
-        String(err);
+          (err as Error).message ??
+          String(err),
+        src,
+        dest,
+      );
       log.warn(
         `ffmpeg frame export failed (offset=${offsetSec}, format=${format}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${stderr}`,
       );
     }
     return false;
   }
+}
+
+/**
+ * ffmpeg's error text with the files it was given replaced by name. The input
+ * names the media file, and an exported frame is named after it; the log must
+ * not carry either, wherever they are saved.
+ */
+function withoutPaths(text: string, src: string, dest: string): string {
+  return text.replaceAll(src, "<input>").replaceAll(dest, "<output>");
 }
 
 async function runFfmpegThumb(
@@ -350,8 +383,12 @@ async function runFfmpegThumb(
   offsetSec: number | undefined,
   keyframeOnly: boolean,
   coverStreamIndex?: number,
+  complexFilter = false,
 ): Promise<boolean> {
   const useOffset = typeof offsetSec === "number";
+  // Write next to dest and rename on success, so a failed or empty run never
+  // touches the thumbnail being shown, and a finished one replaces it whole.
+  const output = path.join(path.dirname(dest), `${randomUUID()}.webp`);
   // scale BEFORE thumbnail: the thumbnail filter keeps its whole scoring
   // window (default 100 frames) in memory, so at full 4K that is ~1.2 GB per
   // process versus ~140 MB once the frames are already 480px. Its histogram
@@ -365,7 +402,9 @@ async function runFfmpegThumb(
     "error",
     "-y",
     "-threads",
-    String(DECODE_FFMPEG_THREADS),
+    // A tiled HEIF/AVIF gets one decoder per tile (192 for a 48MP phone
+    // photo), each with this many threads. A still decodes as fast with one.
+    kind === "image" ? "1" : String(DECODE_FFMPEG_THREADS),
   ];
   if (useOffset) {
     if (keyframeOnly) {
@@ -389,7 +428,7 @@ async function runFfmpegThumb(
     args.push("-map", `0:${coverStreamIndex}`);
   }
   args.push(
-    "-vf",
+    complexFilter ? "-filter_complex" : "-vf",
     vf,
     "-frames:v",
     "1",
@@ -397,23 +436,18 @@ async function runFfmpegThumb(
     "libwebp",
     "-quality",
     "78",
-    dest,
+    output,
   );
   try {
     await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
-    // A corrupt attached picture can leave ffmpeg exiting 0 having written
-    // nothing (or an empty file). Reporting success there would persist
-    // thumb_path with hasThumb = 1, and every request for it would 404. The
-    // video/image path reaches here only after decoding a real frame, so this
-    // check stays scoped to audio rather than changing existing behaviour.
-    if (kind === "audio") {
-      const st = await fsPromises.stat(dest).catch(() => null);
-      if (!st || st.size === 0) {
-        if (st) await fsPromises.unlink(dest).catch(() => {});
-        log.warn(`ffmpeg cover extraction produced no output for ${src}`);
-        return false;
-      }
+    // FFmpeg can exit successfully without writing a frame (a seek past the
+    // end, a stream with no decodable picture).
+    const st = await fsPromises.stat(output).catch(() => null);
+    if (!st || st.size === 0) {
+      log.warn("ffmpeg thumbnail extraction produced no output");
+      return false;
     }
+    await fsPromises.rename(output, dest);
     return true;
   } catch (err) {
     // Surface ffmpeg's reason so the next failure isn't silent. Aborted runs are expected
@@ -423,10 +457,33 @@ async function runFfmpegThumb(
         (err as { stderr?: string }).stderr ??
         (err as Error).message ??
         String(err);
+      // ffmpeg assembles a tiled HEIF/AVIF with a complex filtergraph of its
+      // own and refuses a simple one (-vf) on that output, so the scale goes
+      // into a complex one instead. Only then: with no input label it takes
+      // the assembled image, but for any other file it would take the first
+      // stream, where -vf takes the primary image.
+      if (
+        kind === "image" &&
+        !complexFilter &&
+        stderr.includes("complex filtergraph")
+      ) {
+        return runFfmpegThumb(
+          src,
+          kind,
+          dest,
+          signal,
+          offsetSec,
+          keyframeOnly,
+          coverStreamIndex,
+          true,
+        );
+      }
       log.warn(
-        `ffmpeg thumb failed (offset=${offsetSec ?? "auto"}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${stderr}`,
+        `ffmpeg thumb failed (offset=${offsetSec ?? "auto"}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${withoutPaths(stderr, src, output)}`,
       );
     }
     return false;
+  } finally {
+    await fsPromises.unlink(output).catch(() => {});
   }
 }

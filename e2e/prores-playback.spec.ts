@@ -3,9 +3,13 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import ffmpeg from "ffmpeg-static";
+import { ffmpegPath as ffmpeg } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { skipFirstLaunchTour, waitForIdle } from "./fixtures/helpers";
+import {
+  profileArg,
+  skipFirstLaunchTour,
+  waitForIdle,
+} from "./fixtures/helpers";
 
 test("plays and seeks an indexed ProRes 422 MOV in the full player", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-prores-e2e-"));
@@ -37,7 +41,7 @@ test("plays and seeks an indexed ProRes 422 MOV in the full player", async () =>
   const original = fs.readFileSync(clip);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(tmp, "profile")}`],
+      args: [profileArg(path.join(tmp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: media },
     }),
   );
@@ -45,10 +49,11 @@ test("plays and seeks an indexed ProRes 422 MOV in the full player", async () =>
     const page = await app.firstWindow();
     await skipFirstLaunchTour(page);
     await waitForIdle(page);
-    await page
+    const card = page
       .getByTestId("media-card")
-      .filter({ hasText: "ProRes 422" })
-      .click();
+      .filter({ hasText: "ProRes 422" });
+    await expect(card).toContainText(/320.*180/);
+    await card.click();
     const player = page.locator("video");
     await expect(player).toBeVisible();
     if (await player.evaluate((video: HTMLVideoElement) => video.paused)) {

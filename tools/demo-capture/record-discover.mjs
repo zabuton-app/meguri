@@ -32,7 +32,10 @@ async function hoverRail() {
   const tiles = railTiles();
   const n = Math.min(await tiles.count(), 3);
   for (let i = 0; i < n; i += 1) {
-    await tiles.nth(i).hover({ timeout: 2000 }).catch(() => {});
+    await tiles
+      .nth(i)
+      .hover({ timeout: 2000 })
+      .catch(() => {});
     await sleep(750);
   }
   await page.mouse.move(640, 60);

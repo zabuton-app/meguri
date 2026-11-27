@@ -34,3 +34,10 @@ dist-ssr
 
 # demo-capture sample media
 tools/demo-capture/.media/
+
+# Claude Code: share the path-scoped rules only. Personal instructions go in
+# CLAUDE.local.md; the rest of .claude/ is local state (worktrees, settings).
+CLAUDE.local.md
+!.claude/
+.claude/*
+!.claude/rules/
