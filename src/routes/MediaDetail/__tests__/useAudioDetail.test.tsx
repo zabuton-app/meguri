@@ -71,9 +71,11 @@ afterEach(() => {
 function Probe({
   file,
   explicitStartAt = null,
+  navKey,
 }: {
   file: FileDetail;
   explicitStartAt?: number | null;
+  navKey?: string;
 }) {
   const { startedHere } = useAudioDetail({
     file,
@@ -82,6 +84,7 @@ function Probe({
     autoplay: true,
     startAt: explicitStartAt ?? 0,
     explicitStartAt,
+    navKey,
     pauseVideo: () => {},
   });
   return <span data-testid="started-here">{String(startedHere)}</span>;
@@ -131,6 +134,25 @@ describe("useAudioDetail auto-start", () => {
     expect(el.currentTime).toBe(300);
     // Still the one playback: moved, not restarted.
     expect(playSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves it back to the same time when that time is asked for again", () => {
+    const { rerender } = renderWithProviders(<Probe file={audio} />);
+    act(() => {
+      Object.defineProperty(el, "duration", {
+        value: 600,
+        configurable: true,
+      });
+      el.dispatchEvent(new Event("loadedmetadata"));
+      el.dispatchEvent(new Event("play"));
+    });
+    rerender(<Probe file={audio} explicitStartAt={90} navKey="a" />);
+    expect(el.currentTime).toBe(90);
+    // Listened on to 180 s, then the same point clicked again (a new
+    // navigation to the same URL).
+    el.currentTime = 180;
+    rerender(<Probe file={audio} explicitStartAt={90} navKey="b" />);
+    expect(el.currentTime).toBe(90);
   });
 
   it("leaves a track that is still playing alone", () => {

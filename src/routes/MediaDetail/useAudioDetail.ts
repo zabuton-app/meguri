@@ -34,6 +34,10 @@ interface Options {
    *  scene, a bookmark, a point on the filmstrip's waveform) moves a track
    *  that is already playing, where a plain reopen leaves it alone. */
   explicitStartAt?: number | null;
+  /** The navigation that brought the view here (the location's key). With a
+   *  time asked for, each navigation is a visit of its own, so the same time
+   *  asked for again moves the track back there. */
+  navKey?: string;
   /** Pause the video player, if one is mounted (a no-op otherwise). */
   pauseVideo: () => void;
   /** False when the view is docked as a side peek: the bar sits below the
@@ -49,6 +53,7 @@ export function useAudioDetail({
   autoplay,
   startAt,
   explicitStartAt = null,
+  navKey = "",
   pauseVideo,
   suppressBar = true,
 }: Options) {
@@ -111,9 +116,12 @@ export function useAudioDetail({
     // app_status, and playing then would build a src against an empty origin.
     if (!wsId || !mediaBase) return;
     const trackKey = `${wsId}:${file.id}`;
-    // A time asked for is a visit of its own, so a second click on another
-    // point of the same track (the side peek stays open) moves it again.
-    const visitKey = `${trackKey}:${explicitStartAt ?? ""}`;
+    // A time asked for is a visit of its own, so another click on the same
+    // track (the side peek stays open) moves it again, even to the same time.
+    const visitKey =
+      explicitStartAt == null
+        ? trackKey
+        : `${trackKey}:${explicitStartAt}:${navKey}`;
     if (autoStartedFor.current === visitKey) return;
     autoStartedFor.current = visitKey;
     const loaded = current?.file.id === file.id && current.workspaceId === wsId;
@@ -137,6 +145,7 @@ export function useAudioDetail({
     autoplay,
     startAt,
     explicitStartAt,
+    navKey,
     current,
     isPlaying,
     play,

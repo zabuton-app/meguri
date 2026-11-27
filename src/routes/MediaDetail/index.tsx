@@ -15,7 +15,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
 import { fileNameOf, folderPathOf } from "@/lib/relPath";
@@ -73,6 +78,8 @@ export default function MediaDetail() {
   const fileId = Number(id);
   // Optional initial seek position (seconds), e.g. when the playlist hands over.
   const [searchParams] = useSearchParams();
+  // Each navigation's key: the same `?t=` asked for again is a new request.
+  const location = useLocation();
   // Null when absent: `?t=0` is a start asked for, not a missing one.
   const tParam = searchParams.get("t");
   const explicitStartAt =
@@ -236,6 +243,7 @@ export default function MediaDetail() {
     autoplay,
     startAt,
     explicitStartAt,
+    navKey: location.key,
     pauseVideo: () => playerRef.current?.pause(),
     // The peek ends above the bar, so the bar stays — and for audio it is the
     // transport, the compact tile in the sheet having none.

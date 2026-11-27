@@ -49,7 +49,11 @@ export function Waveform({
           const x = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
           const sec =
             rect.width > 0 ? Math.floor((duration * x) / rect.width) : 0;
-          void navigate(fileHref(file.id, file.workspaceId, { t: sec }));
+          const to = fileHref(file.id, file.workspaceId, { t: sec });
+          // As HashLink does: the place already shown is replaced, not
+          // stacked again in the history.
+          const current = window.location.hash.slice(1) || "/";
+          void navigate(to, { replace: current === to });
         }}
         className={cn(
           "relative z-10 w-full overflow-hidden rounded-item",

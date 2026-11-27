@@ -472,4 +472,40 @@ describe("FilmstripView", () => {
         .dataset.layout,
     ).toBe("side");
   });
+
+  it("does not stack a history entry when the waveform is clicked at the same point again", async () => {
+    view([
+      row({
+        id: 5,
+        kind: "audio",
+        ext: "m4a",
+        relPath: "ep.m4a",
+        duration: 3600,
+      }),
+    ]);
+    const wave = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>(
+        '[data-slot="filmstrip-waveform"]',
+      );
+      expect(el).toBeTruthy();
+      return el!;
+    });
+    vi.spyOn(wave, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      width: 400,
+      top: 0,
+      height: 60,
+      right: 400,
+      bottom: 60,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(wave, { clientX: 100 });
+    await waitFor(() => expect(window.location.hash).toContain("t=900"));
+    const length = window.history.length;
+    fireEvent.click(wave, { clientX: 100 });
+    await act(async () => {});
+    expect(window.history.length).toBe(length);
+  });
 });
