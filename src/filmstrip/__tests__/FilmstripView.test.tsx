@@ -147,6 +147,10 @@ describe("FilmstripView", () => {
     expect(
       document.querySelectorAll('[data-slot="filmstrip-thumb"]'),
     ).toHaveLength(1);
+    // Whole, letterboxed in its 16:9 box like a video's frames, not cropped.
+    const thumb = document.querySelector('[data-slot="filmstrip-thumb"]')!;
+    expect(thumb.className).toContain("bg-black");
+    expect(thumb.querySelector("img")?.className).toContain("object-contain");
     expect(
       document.querySelectorAll('[data-slot="filmstrip-frame"]'),
     ).toHaveLength(0);

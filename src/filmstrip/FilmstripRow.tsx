@@ -174,13 +174,15 @@ export const FilmstripRow = memo(function FilmstripRow({
           to={fileHref(file.id, file.workspaceId)}
           onClick={onThumbnailClick(file)}
           aria-label={fileNameOf(file.relPath)}
-          className="relative z-10 block shrink-0 overflow-hidden rounded-item bg-overlay text-muted"
+          // Black behind the image: its letterbox, as a video frame's.
+          className="relative z-10 block shrink-0 overflow-hidden rounded-item bg-black text-muted"
           style={{ width: layout.frameW, height: layout.frameH }}
         >
           <MediaThumbnail
             file={file}
             mediaBase={mediaBase}
             showPlayOverlay={false}
+            fit="contain"
           />
         </HashLink>
       )}
