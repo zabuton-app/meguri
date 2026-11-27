@@ -473,6 +473,11 @@ export const zhCN: Catalog = {
   "media.metaBpm": "BPM",
   "media.metaKey": "调性",
   "media.metaGenre": "流派",
+  "media.metaCamera": "相机",
+  "media.metaLens": "镜头",
+  "media.metaExposure": "曝光",
+  "media.metaFocalLength": "焦距",
+  "media.metaFocalEquiv": "等效 {mm} mm",
   "media.playHistory": "播放历史",
   "media.scenes": "场景",
   "media.bookmarks": "场景书签",
@@ -573,6 +578,7 @@ export const zhCN: Catalog = {
   "scan.phaseIndex": "正在建立索引",
   "scan.phaseThumbnail": "正在生成缩略图",
   "scan.phaseTags": "正在添加标签",
+  "scan.phaseExif": "正在读取照片信息",
   "scan.cancel": "取消扫描",
 
   // tag editor
@@ -1096,6 +1102,8 @@ export const zhCN: Catalog = {
   "tags.ns.key": "调性",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "流派",
+  "tags.ns.camera": "相机",
+  "tags.ns.lens": "镜头",
   "tags.value.durShort": "短",
   "tags.value.durMedium": "中",
   "tags.value.durLong": "长",

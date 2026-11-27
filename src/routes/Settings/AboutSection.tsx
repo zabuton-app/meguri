@@ -58,6 +58,20 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     licenseUrl: "https://github.com/facebook/react/blob/main/LICENSE",
     sourceUrl: "https://github.com/facebook/react",
   },
+  // A photo's EXIF and XMP (capture time, camera). Shipped unmodified in
+  // node_modules, LICENSE included; MPL-2.0 asks that the source be named.
+  {
+    name: "ExifReader",
+    license: "MPL-2.0",
+    licenseUrl: "https://github.com/mattiasw/ExifReader/blob/main/LICENSE",
+    sourceUrl: "https://github.com/mattiasw/ExifReader",
+  },
+  {
+    name: "@xmldom/xmldom",
+    license: "MIT",
+    licenseUrl: "https://github.com/xmldom/xmldom/blob/master/LICENSE",
+    sourceUrl: "https://github.com/xmldom/xmldom",
+  },
   // The image comparison's matching. Its full notices, with the libraries
   // built into it (Protocol Buffers, zlib, FlatBuffers), are in
   // THIRD_PARTY_NOTICES.txt in the app's resources.

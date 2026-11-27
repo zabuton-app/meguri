@@ -491,6 +491,11 @@ export const ja = {
   "media.metaBpm": "BPM",
   "media.metaKey": "キー",
   "media.metaGenre": "ジャンル",
+  "media.metaCamera": "カメラ",
+  "media.metaLens": "レンズ",
+  "media.metaExposure": "露出",
+  "media.metaFocalLength": "焦点距離",
+  "media.metaFocalEquiv": "35mm換算 {mm} mm",
   "media.playHistory": "再生履歴",
   "media.scenes": "シーン",
   "media.bookmarks": "シーンブックマーク",
@@ -596,6 +601,7 @@ export const ja = {
   "scan.phaseIndex": "インデックス作成",
   "scan.phaseThumbnail": "サムネイル生成",
   "scan.phaseTags": "タグ付与",
+  "scan.phaseExif": "写真情報の読み取り",
   "scan.cancel": "スキャンをキャンセル",
 
   // タグ編集
@@ -1151,6 +1157,8 @@ export const ja = {
   "tags.ns.key": "キー",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "ジャンル",
+  "tags.ns.camera": "カメラ",
+  "tags.ns.lens": "レンズ",
   "tags.value.durShort": "短尺",
   "tags.value.durMedium": "中尺",
   "tags.value.durLong": "長尺",
