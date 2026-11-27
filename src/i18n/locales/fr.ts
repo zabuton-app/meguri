@@ -4,6 +4,7 @@ import type { Catalog } from "../message";
 export const fr: Catalog = {
   // common
   "common.close": "Fermer",
+  "common.retry": "Réessayer",
   "common.cancel": "Annuler",
   "common.ok": "OK",
   "common.actionFailed": "Impossible d'effectuer l'action",
@@ -908,6 +909,8 @@ export const fr: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "Choisis dans « {path} »",
   "discover.empty": "Aucun média à recommander.",
+  "discover.loadFailed":
+    "Impossible de charger les médias à recommander. Veuillez réessayer.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos, des images et des fichiers audio ; ils seront recommandés ici au hasard.",
   "discover.sceneHint": "Cliquez sur une scène pour y accéder",
@@ -916,6 +919,8 @@ export const fr: Catalog = {
   // Historique de lecture
   "history.title": "Historique de lecture",
   "history.empty": "Aucun historique de lecture pour l'instant.",
+  "history.loadFailed":
+    "Impossible de charger l'historique de lecture. Veuillez réessayer.",
   "history.emptyHint":
     "Lisez des vidéos, des images ou des fichiers audio et ils apparaîtront ici.",
   "history.clear": "Effacer l'historique",
@@ -934,6 +939,8 @@ export const fr: Catalog = {
   // Missing files
   "missing.title": "Fichiers introuvables",
   "missing.empty": "Aucun fichier introuvable.",
+  "missing.loadFailed":
+    "Impossible de rechercher les fichiers introuvables. Veuillez réessayer.",
   "missing.hint":
     "Fichiers qu’un scan n’a pas trouvés sur le disque. Si un fichier revient, il retrouve ses collections comme avant. Sélectionnez uniquement ceux qui ne reviendront pas, puis supprimez-les.",
   "missing.scanning":
@@ -1244,6 +1251,7 @@ export const fr: Catalog = {
   "tags.cloudOnlyAuto":
     "Seuls des tags automatiques sont disponibles. Activez les tags automatiques pour les voir.",
   "tags.empty": "Aucun tag pour l'instant.",
+  "tags.loadFailed": "Impossible de charger les tags. Veuillez réessayer.",
   "tags.emptyHint":
     "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",
   "tags.searchPlaceholder": "Filtrer les tags",

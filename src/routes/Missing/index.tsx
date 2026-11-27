@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
+import { LoadError } from "@/components/LoadError";
 import { HistoryModal } from "@/routes/History/HistoryModal";
 
 const MODAL_SIZE_KEY = "meguri.missing.modalSize";
@@ -203,6 +204,12 @@ export default function Missing() {
             <Skeleton key={i} className="h-14 w-full rounded-card" />
           ))}
         </div>
+      ) : missing.isError && !missing.data ? (
+        <LoadError
+          message={t("missing.loadFailed")}
+          onRetry={() => void missing.refetch()}
+          retrying={missing.isFetching}
+        />
       ) : items.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <FileX className="size-10 opacity-50" />

@@ -4,6 +4,7 @@ import type { Catalog } from "../message";
 export const es: Catalog = {
   // common
   "common.close": "Cerrar",
+  "common.retry": "Reintentar",
   "common.cancel": "Cancelar",
   "common.ok": "Aceptar",
   "common.actionFailed": "No se pudo completar la acción",
@@ -905,6 +906,8 @@ export const es: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "Eligiendo de «{path}»",
   "discover.empty": "No hay medios para recomendar.",
+  "discover.loadFailed":
+    "No se pudieron cargar los medios para recomendar. Inténtalo de nuevo.",
   "discover.emptyHint":
     "Ejecuta «Escanear» para importar vídeos, imágenes y audios y se recomendarán aquí al azar.",
   "discover.sceneHint": "Haz clic en una escena para saltar a ese punto",
@@ -913,6 +916,8 @@ export const es: Catalog = {
   // Historial de reproducción
   "history.title": "Historial de reproducción",
   "history.empty": "Aún no hay historial de reproducción.",
+  "history.loadFailed":
+    "No se pudo cargar el historial de reproducción. Inténtalo de nuevo.",
   "history.emptyHint": "Reproduce vídeos, imágenes o audios y aparecerán aquí.",
   "history.clear": "Borrar historial",
   "history.clearAction": "Borrar",
@@ -930,6 +935,8 @@ export const es: Catalog = {
   // Missing files
   "missing.title": "Archivos no encontrados",
   "missing.empty": "No hay archivos no encontrados.",
+  "missing.loadFailed":
+    "No se pudieron buscar los archivos no encontrados. Inténtalo de nuevo.",
   "missing.hint":
     "Archivos que un escaneo no encontró en el disco. Si un archivo vuelve, regresa a sus colecciones como antes. Selecciona solo los que no van a volver y elimínalos.",
   "missing.scanning":
@@ -1239,6 +1246,7 @@ export const es: Catalog = {
   "tags.cloudOnlyAuto":
     "Solo hay etiquetas automáticas. Activa las etiquetas automáticas para verlas.",
   "tags.empty": "Todavía no hay etiquetas.",
+  "tags.loadFailed": "No se pudieron cargar las etiquetas. Inténtalo de nuevo.",
   "tags.emptyHint":
     "Añade etiquetas desde la vista de detalle y aparecerán aquí.",
   "tags.searchPlaceholder": "Filtrar etiquetas",

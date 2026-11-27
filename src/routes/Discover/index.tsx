@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/carousel";
 import { useI18n } from "@/i18n/I18nProvider";
 import { FolderScopeChip } from "@/components/FolderScopeChip";
+import { LoadError } from "@/components/LoadError";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { usePreferences } from "@/settings/PreferencesProvider";
@@ -321,6 +322,13 @@ export default function Discover() {
       <div ref={viewRef} className="h-full w-full">
         {loading ? (
           <Skeleton className="h-full w-full rounded-none" />
+        ) : queue.isError && !queue.data ? (
+          <LoadError
+            className="h-full"
+            message={t("discover.loadFailed")}
+            onRetry={() => void queue.refetch()}
+            retrying={queue.isFetching}
+          />
         ) : items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
             <Sparkles className="size-10 opacity-50" />

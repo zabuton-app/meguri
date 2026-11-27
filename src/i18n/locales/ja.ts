@@ -3,6 +3,7 @@
 export const ja = {
   // 共通
   "common.close": "閉じる",
+  "common.retry": "もう一度読み込む",
   "common.cancel": "キャンセル",
   "common.ok": "OK",
   "common.actionFailed": "操作に失敗しました",
@@ -810,6 +811,8 @@ export const ja = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "「{path}」の中から選んでいます",
   "discover.empty": "おすすめできるメディアがありません。",
+  "discover.loadFailed":
+    "おすすめのメディアを読み込めませんでした。もう一度お試しください。",
   "discover.emptyHint":
     "「スキャン」で動画や画像、音声を取り込むと、ここでランダムにおすすめされます。",
   "discover.sceneHint": "シーンをクリックするとその位置に移動します",
@@ -818,6 +821,8 @@ export const ja = {
   // 再生履歴
   "history.title": "再生履歴",
   "history.empty": "再生履歴はまだありません。",
+  "history.loadFailed":
+    "再生履歴を読み込めませんでした。もう一度お試しください。",
   "history.emptyHint":
     "動画や画像、音声を再生すると、ここに履歴が表示されます。",
   "history.clear": "履歴をクリア",
@@ -833,6 +838,8 @@ export const ja = {
   // Missing files
   "missing.title": "見つからないファイル",
   "missing.empty": "見つからないファイルはありません。",
+  "missing.loadFailed":
+    "見つからないファイルを確認できませんでした。もう一度お試しください。",
   "missing.hint":
     "スキャンでディスクに見つからなかったファイルです。ファイルが戻ってくれば、コレクションなどはそのまま復活します。もう戻らないファイルだけを選んで削除してください。",
   "missing.scanning":
@@ -1089,6 +1096,7 @@ export const ja = {
   "tags.cloudOnlyAuto":
     "表示できるのは自動タグのみです。自動タグをオンにすると表示されます。",
   "tags.empty": "タグはまだありません。",
+  "tags.loadFailed": "タグを読み込めませんでした。もう一度お試しください。",
   "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
   "tags.searchPlaceholder": "タグを絞り込み",
   "tags.noMatch": "一致するタグがありません。",

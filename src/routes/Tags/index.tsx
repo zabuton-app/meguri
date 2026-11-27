@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { LoadError } from "@/components/LoadError";
 import { invalidateTagCatalog } from "@/lib/queryCache";
 import { applyTagFilter } from "@/lib/ui-events";
 import { tagHumanLabel, tagNamespaceLabel } from "@/lib/tagLabel";
@@ -421,7 +422,7 @@ export default function Tags() {
         </div>
       )}
 
-      {/* Loading and "no tags at all" belong to the catalog, not to a view. */}
+      {/* Loading, a failed load and "no tags at all" belong to the catalog, not to a view. */}
       {loading ? (
         <ScrollArea className="page-scroll min-h-0 flex-1">
           <div className="flex flex-col gap-2 p-4">
@@ -430,6 +431,12 @@ export default function Tags() {
             ))}
           </div>
         </ScrollArea>
+      ) : catalog.isError && !catalog.data ? (
+        <LoadError
+          message={t("tags.loadFailed")}
+          onRetry={() => void catalog.refetch()}
+          retrying={catalog.isFetching}
+        />
       ) : all.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <TagsIcon className="size-10 opacity-50" />

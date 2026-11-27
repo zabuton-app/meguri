@@ -35,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { LoadError } from "@/components/LoadError";
 import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { HistoryModal } from "./HistoryModal";
@@ -262,7 +263,13 @@ export default function History() {
         </div>
       </header>
 
-      {!loading && items.length === 0 ? (
+      {history.isError && !history.data ? (
+        <LoadError
+          message={t("history.loadFailed")}
+          onRetry={() => void history.refetch()}
+          retrying={history.isFetching}
+        />
+      ) : !loading && items.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <HistoryIcon className="size-10 opacity-50" />
           <p>{t("history.empty")}</p>

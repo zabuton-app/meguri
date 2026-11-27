@@ -9,7 +9,10 @@ import {
   sampleFileRow,
   WS_ID,
 } from "@/test/fixtures";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
 import type {
   AppStatus,
   MissingFileRow,
@@ -77,6 +80,40 @@ describe("Missing", () => {
     });
     renderWithProviders(<MissingRoute />, { route: "/missing" });
     expect(await screen.findByText("No missing files.")).toBeTruthy();
+  });
+
+  it("shows a load error with a retry instead of the empty state", async () => {
+    mocks.missingFilesList.mockRejectedValueOnce(new Error("db locked"));
+    renderWithProviders(<MissingRoute />, { route: "/missing" });
+    expect(
+      await screen.findByText(
+        "Could not check for missing files. Please try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("No missing files.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("a.mp4")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps the loaded list when a later refetch fails", async () => {
+    const queryClient = createTestQueryClient();
+    renderWithProviders(<MissingRoute />, {
+      route: "/missing",
+      queryClient,
+    });
+    expect(await screen.findByText("a.mp4")).toBeTruthy();
+
+    mocks.missingFilesList.mockRejectedValue(new Error("db locked"));
+    await queryClient.refetchQueries({ queryKey: ["missing_files"] });
+    await waitFor(() =>
+      expect(queryClient.getQueryState(["missing_files", WS_ID])?.status).toBe(
+        "error",
+      ),
+    );
+    expect(screen.getByText("a.mp4")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("says when a workspace being scanned was left out, and when the list is cut", async () => {
