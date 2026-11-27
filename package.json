@@ -67,6 +67,7 @@
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-virtual": "^3.14.26",
     "@techstark/opencv-js": "5.0.0-release.1",
+    "@xmldom/xmldom": "^0.9.12",
     "@zabuton-app/ffmpeg-binaries": "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.6/zabuton-app-ffmpeg-binaries-1.0.6.tgz",
     "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
@@ -77,6 +78,7 @@
     "electron-log": "^5.4.4",
     "embla-carousel-react": "^8.6.0",
     "emoji-mart": "^5.6.0",
+    "exifreader": "^4.56.0",
     "graphology": "^0.26.0",
     "lucide-react": "^1.73.0",
     "react": "^19.3.1",
@@ -202,6 +204,7 @@
   "allowScripts": {
     "electron-winstaller@5.4.0": true,
     "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.6/zabuton-app-ffmpeg-binaries-1.0.6.tgz": true,
-    "better-sqlite3": false
+    "better-sqlite3": false,
+    "exifreader": false
   }
 }
