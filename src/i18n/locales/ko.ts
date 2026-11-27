@@ -54,6 +54,10 @@ export const ko: Catalog = {
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
+  "settings.filmstripFrames": "필름스트립 프레임 수",
+  "settings.filmstripFramesDesc":
+    "필름스트립 보기에서 한 줄에 놓을 프레임 수입니다. 자동은 줄 너비에 맞춥니다.",
+  "settings.filmstripFramesAuto": "자동",
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",

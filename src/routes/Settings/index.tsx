@@ -21,6 +21,7 @@ import { type TranslationKey } from "@/i18n/locales/ja";
 import {
   usePreferences,
   SCENE_COUNT_OPTIONS,
+  FILMSTRIP_FRAMES_OPTIONS,
   PLAYLIST_IMAGE_SECONDS_OPTIONS,
   FRAME_QUALITY_OPTIONS,
   isFrameQuality,
@@ -163,6 +164,8 @@ export default function Settings() {
   const {
     sceneCount,
     setSceneCount,
+    filmstripFrames,
+    setFilmstripFrames,
     keybindingPreset,
     setKeybindingPreset,
     hideSupportLink,
@@ -534,6 +537,38 @@ export default function Settings() {
                   </SelectTrigger>
                   <SelectContent>
                     {SCENE_COUNT_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </section>
+
+              {/* Filmstrip frame count */}
+              <section className="flex items-center justify-between gap-3 border-b border-border py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.filmstripFrames")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.filmstripFramesDesc")}
+                  </span>
+                </div>
+                <Select
+                  value={String(filmstripFrames)}
+                  onValueChange={(v) =>
+                    setFilmstripFrames(v === "auto" ? "auto" : Number(v))
+                  }
+                >
+                  <SelectTrigger className="min-w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      {t("settings.filmstripFramesAuto")}
+                    </SelectItem>
+                    {FILMSTRIP_FRAMES_OPTIONS.map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         {n}
                       </SelectItem>

@@ -54,6 +54,10 @@ export const ja = {
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.filmstripFrames": "フィルムストリップのコマ数",
+  "settings.filmstripFramesDesc":
+    "フィルムストリップ表示で1行に並べるコマの数。自動では行の幅に合わせる。",
+  "settings.filmstripFramesAuto": "自動",
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",

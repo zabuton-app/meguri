@@ -56,6 +56,10 @@ export const en: Catalog = {
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",
+  "settings.filmstripFrames": "Filmstrip frames",
+  "settings.filmstripFramesDesc":
+    "Frames per row in the filmstrip view. Auto fits the row's width.",
+  "settings.filmstripFramesAuto": "Auto",
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
     "Preview the scene under the cursor while hovering over a video thumbnail.",
