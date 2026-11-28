@@ -367,6 +367,23 @@ export const en: Catalog = {
   "filter.durationChip": "Duration",
   "filter.widthChip": "Width",
   "filter.heightChip": "Height",
+  "filter.ratingAtLeast": {
+    one: "{count} star and up",
+    other: "{count} stars and up",
+  },
+  "filter.ratingAbove": {
+    one: "More than {count} star",
+    other: "More than {count} stars",
+  },
+  "filter.ratingAtMost": {
+    one: "{count} star and below",
+    other: "{count} stars and below",
+  },
+  "filter.ratingBelow": {
+    one: "Fewer than {count} star",
+    other: "Fewer than {count} stars",
+  },
+  "filter.ratingExactly": { one: "{count} star", other: "{count} stars" },
   "filter.excludeChip": "Exclude",
   "filter.kindFilter": "Filter by kind",
   "filter.playState": "Play state",

@@ -932,6 +932,31 @@ describe("search field", () => {
     );
   });
 
+  it("completes rating: with worded conditions, Enter taking the first (#732)", () => {
+    renderMenu();
+    type("rating:");
+    expect(texts().slice(0, 5)).toEqual([
+      "rating:>=44 stars and up",
+      "rating:>=33 stars and up",
+      "rating:55 stars",
+      "rating:0No rating",
+      "rating:<=22 stars and below",
+    ]);
+    // Rows kept from the list before do not stay ahead of new ones.
+    type("rating:<");
+    expect(texts()[0]).toBe("rating:<=00 stars and below");
+    type("rating:");
+    type("rating:>");
+    expect(texts().slice(0, 2)).toEqual([
+      "rating:>=55 stars and up",
+      "rating:>=44 stars and up",
+    ]);
+    type("rating:>=");
+    expect(texts()[0]).toBe("rating:>=55 stars and up");
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(chips()).toEqual(["rating:>=5"]);
+  });
+
   it("offers the prefix a word begins after its search, left open when picked (#730)", () => {
     const { props } = renderMenu();
     type("ra");

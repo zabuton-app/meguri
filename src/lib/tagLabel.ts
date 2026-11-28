@@ -6,6 +6,7 @@ import {
   parseSearchDirective,
   parseTagSearchToken,
   type NumericSearch,
+  type RatingSearch,
   type SearchDirective,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -89,6 +90,14 @@ const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
   height: "filter.heightChip",
 };
 
+const RATING_LABEL_KEYS: Record<RatingSearch["op"], TranslationKey> = {
+  ">=": "filter.ratingAtLeast",
+  ">": "filter.ratingAbove",
+  "<=": "filter.ratingAtMost",
+  "<": "filter.ratingBelow",
+  "=": "filter.ratingExactly",
+};
+
 /**
  * What a directive other than `tag:` reads as: its field and value, `Hash:
  * 3fa9`, `Size: >1gb` (the comparison as typed). A `tag:` directive's label
@@ -106,8 +115,12 @@ export function directiveLabel(
       return `${t("filter.extChip")}: ${d.value}`;
     case "numeric":
       return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
-    case "rating":
-      return `${t("media.rating")}: ${d.value}`;
+    case "rating": {
+      // Worded as setting a rating reads; a file without one counts as 0.
+      const { op, value } = d.rating;
+      if (op === "=" && value === 0) return t("command.ratingNone");
+      return t(RATING_LABEL_KEYS[op], { count: value });
+    }
     case "favorite":
       // Unlike the favorite control's `♥ Favorites`: both can be on at once,
       // and each chip clears only its own.

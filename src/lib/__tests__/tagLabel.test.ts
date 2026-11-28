@@ -7,6 +7,7 @@ import {
 } from "@/lib/tagLabel";
 import { en } from "@/i18n/locales/en";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { pickMessage, type Message } from "@/i18n/message";
 
 // The label helpers only need a lookup, not the whole provider.
 const t = ((key: string) =>
@@ -74,9 +75,23 @@ describe("searchTokenLabel", () => {
     expect(searchTokenLabel(t, "ext:.MP4")).toBe("Extension: mp4");
   });
 
-  it("names a rating: directive by its comparison (#525)", () => {
-    expect(searchTokenLabel(t, "rating:>=4")).toBe("Rating: >=4");
-    expect(searchTokenLabel(t, "rating:3")).toBe("Rating: 3");
+  it("words a rating: directive's comparison (#732)", () => {
+    // These labels take a count, so the lookup fills it in by its plural.
+    const rules = new Intl.PluralRules("en");
+    const tc = ((key: string, params?: { count?: number }) =>
+      pickMessage(
+        (en as Record<string, Message>)[key] ?? key,
+        rules,
+        params?.count,
+      ).replace("{count}", String(params?.count))) as unknown as TFunc;
+    expect(searchTokenLabel(tc, "rating:>=4")).toBe("4 stars and up");
+    expect(searchTokenLabel(tc, "rating:>4")).toBe("More than 4 stars");
+    expect(searchTokenLabel(tc, "rating:<=2")).toBe("2 stars and below");
+    expect(searchTokenLabel(tc, "rating:<2")).toBe("Fewer than 2 stars");
+    expect(searchTokenLabel(tc, "rating:3")).toBe("3 stars");
+    expect(searchTokenLabel(tc, "rating:0")).toBe("No rating");
+    expect(searchTokenLabel(tc, "rating:>=1")).toBe("1 star and up");
+    expect(searchTokenLabel(tc, "rating:1")).toBe("1 star");
   });
 
   it("names an is:fav directive as favorites (#525)", () => {

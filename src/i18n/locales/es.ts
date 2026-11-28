@@ -384,6 +384,26 @@ export const es: Catalog = {
   "filter.durationChip": "Duración",
   "filter.widthChip": "Ancho",
   "filter.heightChip": "Alto",
+  "filter.ratingAtLeast": {
+    one: "{count} estrella o más",
+    other: "{count} estrellas o más",
+  },
+  "filter.ratingAbove": {
+    one: "Más de {count} estrella",
+    other: "Más de {count} estrellas",
+  },
+  "filter.ratingAtMost": {
+    one: "{count} estrella o menos",
+    other: "{count} estrellas o menos",
+  },
+  "filter.ratingBelow": {
+    one: "Menos de {count} estrella",
+    other: "Menos de {count} estrellas",
+  },
+  "filter.ratingExactly": {
+    one: "{count} estrella",
+    other: "{count} estrellas",
+  },
   "filter.excludeChip": "Excluir",
   "filter.kindFilter": "Filtrar por tipo",
   "filter.playState": "Estado de reproducción",

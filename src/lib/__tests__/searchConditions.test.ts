@@ -149,7 +149,8 @@ describe("describeConditions", () => {
         "favorite",
       ]),
     );
-    expect(find(query, "directive-0").label).toBe(`${t("media.rating")}: >=4`);
+    // Worded as the completion and the chip's tooltip read it (#732).
+    expect(find(query, "directive-0").label).toBe("4 stars and up");
     // Told apart from the favorite control's chip, which reads the same word.
     expect(find(query, "directive-1").label).toBe(
       `${t("favorite.chip")} (is:fav)`,
