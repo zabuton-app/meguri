@@ -359,6 +359,8 @@ export const fr: Catalog = {
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
   "filter.directiveSuggestions": "Conditions de recherche",
+  "filter.prefixWorkspace": "Passer à un espace de travail",
+  "filter.prefixCollection": "Ouvrir une collection",
   "filter.tagElsewhere": "autres espaces de travail seulement",
   "filter.all": "Tout",
   "filter.played": "Lu",

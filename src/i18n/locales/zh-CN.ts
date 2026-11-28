@@ -311,6 +311,8 @@ export const zhCN: Catalog = {
   "filter.searchPlaceholder": "搜索文件名或标签",
   "filter.tagSuggestions": "标签建议",
   "filter.directiveSuggestions": "搜索条件建议",
+  "filter.prefixWorkspace": "切换到工作区",
+  "filter.prefixCollection": "打开收藏集",
   "filter.tagElsewhere": "仅在其他工作区",
   "filter.all": "全部",
   "filter.played": "已播放",

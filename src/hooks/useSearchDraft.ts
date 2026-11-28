@@ -109,12 +109,16 @@ export function useSearchDraft(initial: string) {
   const accept = (tag: TagSummary) =>
     acceptToken(tagSearchToken(tag.name, tag.namespace));
 
-  /** Swap the word for a directive on `ns`, left open for its values. */
-  const startNamespace = (ns: string) => {
+  /** Swap the word at the end of the text for `token`, left open after it. */
+  const startToken = (token: string) => {
     const tokens = splitSearchTokens(text);
-    tokens[tokens.length - 1] = `${TAG_SEARCH_PREFIX}:${ns}:`;
+    tokens[tokens.length - 1] = token;
     apply(joinSearchTokens(tokens));
   };
+
+  /** Swap the word for a directive on `ns`, left open for its values. */
+  const startNamespace = (ns: string) =>
+    startToken(`${TAG_SEARCH_PREFIX}:${ns}:`);
 
   /**
    * The chip keys, for the field's keydown. Returns true when the key was
@@ -174,6 +178,7 @@ export function useSearchDraft(initial: string) {
     removeChip,
     accept,
     acceptToken,
+    startToken,
     startNamespace,
     onKey,
   };
