@@ -22,6 +22,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  const legacy = path.join(userData, "config.json");
+  if (fs.existsSync(legacy)) fs.chmodSync(legacy, 0o644);
   fs.rmSync(userData, { recursive: true, force: true });
 });
 
@@ -38,6 +40,31 @@ describe("the note template setting", () => {
     const again = await freshConfig();
     expect(again.loadConfig().noteTemplate).toBe(template);
   });
+
+  it("stores what it is given as a note would be, and returns it", async () => {
+    const c = await freshConfig();
+    expect(c.saveNoteTemplate("## Source")).toBe("## Source");
+    expect(c.loadConfig().noteTemplate).toBe("## Source");
+    // Only whitespace is no template, as it is no note.
+    expect(c.saveNoteTemplate("  \n ")).toBe("");
+    expect(c.loadConfig().noteTemplate).toBe("");
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "throws when the template could not be stored, rather than report it saved",
+    async () => {
+      // An unreadable config.json at startup leaves the settings unwritable
+      // for the session (see configProblem.test.ts): every write is lost.
+      const legacy = path.join(userData, "config.json");
+      fs.writeFileSync(legacy, JSON.stringify({ roots: [] }));
+      fs.chmodSync(legacy, 0o000);
+      const c = await freshConfig();
+      expect(() => c.saveNoteTemplate("## Source")).toThrow(
+        /note template could not be saved/,
+      );
+      expect(c.loadConfig().noteTemplate).toBe("");
+    },
+  );
 
   it("falls back to none for a stored value that is not a string or is too long", async () => {
     writeStoredSettings(userData, { noteTemplate: 42, roots: ["/media"] });

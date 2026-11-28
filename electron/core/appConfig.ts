@@ -43,7 +43,7 @@ import type { AutoTagEngine } from "./autoTagDeriver.js";
 import { errorCode, openSettingsDb, type DB } from "./db.js";
 import log from "./logger.js";
 import { libraryDbPath } from "./paths.js";
-import { NOTE_MAX_MARKDOWN } from "../../shared/note.js";
+import { NOTE_MAX_MARKDOWN, normalizeNote } from "../../shared/note.js";
 
 export interface AppConfig {
   /** Registered roots (absolute paths, normalized). */
@@ -596,6 +596,20 @@ export function saveAutoTag(config: AutoTagConfig): void {
   if (JSON.stringify(loadConfig().autoTag) !== JSON.stringify(config)) {
     throw new Error("auto-tagging settings could not be saved");
   }
+}
+
+/**
+ * Store the note template (#345), normalized as a note is (only whitespace is
+ * none), and return what was stored. Read back for the same reason as
+ * saveAutoTag: a write that did not land must not show as saved.
+ */
+export function saveNoteTemplate(template: string): string {
+  const noteTemplate = normalizeNote(template) ?? "";
+  updateConfig((c) => ({ ...c, noteTemplate }));
+  if (loadConfig().noteTemplate !== noteTemplate) {
+    throw new Error("the note template could not be saved");
+  }
+  return noteTemplate;
 }
 
 /** The settings a pass applies, as one comparable value. */

@@ -237,6 +237,27 @@ describe("NoteCard with a note template (#345)", () => {
     expect(saved).toMatch(/^## Source\s+## Licence\s*$/);
   });
 
+  it("does not undo into a template that was put away untouched", async () => {
+    const queryClient = withTemplate("## Old");
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
+      queryClient,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await act(async () => {
+      queryClient.setQueryData(NOTE_TEMPLATE_QUERY_KEY, "## New");
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    act(() => {
+      editorOf().commands.undo();
+    });
+    expect(screen.getByRole("heading", { name: "New" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Old" })).toBeNull();
+    await new Promise((r) => setTimeout(r, SAVE_DELAY_MS + 200));
+    expect(mocks.fileSetNote).not.toHaveBeenCalled();
+  });
+
   it("uses the template as it is when the note is started", async () => {
     const queryClient = withTemplate("## Old");
     renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {

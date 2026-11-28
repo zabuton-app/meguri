@@ -139,9 +139,14 @@ export default function NoteCard({
       editor.commands.focus(caret.current ?? "end");
       caret.current = null;
     } else if (started.current !== null) {
-      // Left as the template: it was no note, so show none.
+      // Left as the template: it was no note, so show none. Out of the undo
+      // history too, as its insertion is: undo must never bring it back.
       if (noteOf(editor, started.current) === null) {
-        editor.commands.setContent("", { emitUpdate: false });
+        editor
+          .chain()
+          .setMeta("addToHistory", false)
+          .setContent("", { emitUpdate: false })
+          .run();
       }
       started.current = null;
     }
