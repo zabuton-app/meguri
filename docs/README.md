@@ -19,6 +19,8 @@ For what the app is, how to install it, and how to use it, see the top-level
   on-the-fly remux, frame previews).
 - [Renderer](renderer.md) — the React app: routing, providers, data fetching,
   internationalization, theming, and content zoom.
+- [Note Markdown](note-markdown.md) — which Markdown a file's note and the
+  note template read and write, and what changes after a round trip.
 - [Build and CI](build-and-ci.md) — npm scripts, the electron-vite build, the
   two-project test setup, packaging, CI, and Docker-based development.
 - [Crash Reports](crash-reports.md) — locating dumps and symbolizing native
