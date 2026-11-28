@@ -232,7 +232,12 @@ function openStore(file: string): boolean {
       db
         .prepare("SELECT 1 FROM app_settings WHERE key = ?")
         .get(IMPORTED_KEY) !== undefined;
-    return imported || importConfigJson(db);
+    if (!imported && !importConfigJson(db)) return false;
+    // Read once now, so a later read that fails serves these (lastGood) and
+    // never the defaults, which a whole-field write would save over what is
+    // stored (#734). A failure here blocks writes, as any other at startup.
+    lastGood = readStored(db);
+    return true;
   } catch (e) {
     log.error("the settings could not be imported into the library", e);
     configProblem = "unreadable";
