@@ -26,9 +26,9 @@ import {
   RefreshCw,
   Search,
   Settings,
+  ListFilter,
   Sparkles,
   Star,
-  StickyNote,
   Sun,
   Tag,
   Tags as TagsIcon,
@@ -78,13 +78,17 @@ import { commandMenuShortcut } from "@/lib/platform";
 import { fileNameOf } from "@/lib/relPath";
 import { recentSearchKey } from "@/lib/recentSearches";
 import {
-  fixedDirectiveSuggestions,
   namespaceSuggestions,
   pendingDirective,
   plainWordAtCaret,
   joinQueryChips,
 } from "@/lib/searchTokens";
 import { searchTokenLabel, tagNamespaceLabel } from "@/lib/tagLabel";
+import {
+  prefixSuggestions,
+  valueSuggestions,
+  type PrefixSuggestion,
+} from "@/lib/directiveCompletions";
 import { cn } from "@/lib/utils";
 import { clearAllTarget, describeConditions } from "@/lib/searchConditions";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
@@ -488,8 +492,10 @@ function CommandMenuBody({
     : null;
   const word =
     completing && directiveValue === null ? plainWordAtCaret(draft.text) : null;
-  // `has:` offers `has:note`: a directive with one value, not a tag.
-  const fixed = completing ? fixedDirectiveSuggestions(draft.text) : [];
+  // The values of a directive with a fixed few (`has:` offers `has:note`),
+  // and the prefixes a word begins (`ra` offers `rating:`) (#730).
+  const fixed = completing ? valueSuggestions(draft.text) : [];
+  const prefixes = completing ? prefixSuggestions(draft.text) : [];
   // The search row: first once the field is edited, and while a search is
   // only shown again too, so Enter on the field as opened (`/` then Enter,
   // as in a search box) runs that search rather than whichever command
@@ -715,6 +721,18 @@ function CommandMenuBody({
                 </CommandItem>
               </CommandGroup>
             )}
+            {/* After the search row, as a word's tags are: Enter on a word
+                still searches (#542). */}
+            <PrefixCompletions
+              t={t}
+              prefixes={prefixes}
+              draft={draft}
+              onPicked={refocus}
+              onOpenPage={(page) => {
+                draft.clearText();
+                setPage(page, "");
+              }}
+            />
             {word !== null && (
               <TagCompletions
                 t={t}
@@ -1134,7 +1152,7 @@ function DirectiveCompletions({
               onPicked();
             }}
           >
-            <StickyNote />
+            <ListFilter />
             <span className="truncate">
               <span className="text-muted">{token.slice(0, colon)}</span>
               {token.slice(colon)}
@@ -1145,6 +1163,52 @@ function DirectiveCompletions({
           </CommandItem>
         );
       })}
+    </CommandGroup>
+  );
+}
+
+/**
+ * The directive prefixes the word at the end of the field begins (#730).
+ * Picking one leaves it open in the field for its value; `ws:` and `col:`
+ * open their page instead.
+ */
+function PrefixCompletions({
+  t,
+  prefixes,
+  draft,
+  onPicked,
+  onOpenPage,
+}: {
+  t: TFunc;
+  prefixes: PrefixSuggestion[];
+  draft: SearchDraft;
+  onPicked: () => void;
+  onOpenPage: (page: NonNullable<PrefixSuggestion["page"]>) => void;
+}) {
+  if (prefixes.length === 0) return null;
+  return (
+    // Force-mounted, as the other completions are: they match the end of the
+    // field, not the whole of it.
+    <CommandGroup heading={t("filter.directiveSuggestions")} forceMount>
+      {prefixes.map(({ token, label, page }) => (
+        <CommandItem
+          key={token}
+          forceMount
+          value={`complete-prefix ${token}`}
+          onSelect={() => {
+            if (page) {
+              onOpenPage(page);
+              return;
+            }
+            draft.startToken(token);
+            onPicked();
+          }}
+        >
+          <ListFilter />
+          <span className="truncate">{token}</span>
+          <span className="truncate text-xs text-muted">{t(label)}</span>
+        </CommandItem>
+      ))}
     </CommandGroup>
   );
 }

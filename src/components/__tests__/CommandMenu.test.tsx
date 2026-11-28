@@ -886,6 +886,42 @@ describe("search field", () => {
     expect(props.onSearch).not.toHaveBeenCalled();
   });
 
+  it("completes is:fav after is:, first, and chips the pick (#730)", () => {
+    renderMenu();
+    type("is:");
+    expect(texts()[0]).toBe("is:favFavorites (is:fav)");
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(chips()).toEqual(["is:fav"]);
+  });
+
+  it("offers the prefix a word begins after its search, left open when picked (#730)", () => {
+    const { props } = renderMenu();
+    type("ra");
+    expect(texts()[0]).toBe("Search for “ra”↵");
+    expect(texts()).toContain("rating:Rating");
+    fireEvent.click(screen.getByText("rating:"));
+    expect(field().value).toBe("rating:");
+    expect(chips()).toEqual([]);
+    expect(props.onSearch).not.toHaveBeenCalled();
+  });
+
+  it("offers a prefix negated after a dash (#730)", () => {
+    renderMenu();
+    type("sunset -ra");
+    fireEvent.click(screen.getByText("-rating:"));
+    expect(field().value).toBe("sunset -rating:");
+  });
+
+  it("opens the workspace page from ws: offered for a word alone (#730)", async () => {
+    renderMenu();
+    type("sunset ws");
+    expect(screen.queryByText("ws:")).toBeNull();
+    type("ws");
+    fireEvent.click(screen.getByText("ws:"));
+    expect(await screen.findByText("Photos")).toBeTruthy();
+    expect(field().value).toBe("");
+  });
+
   it("offers an ordinary word's search first, then the tags it names", async () => {
     renderMenu({ filter: { q: "tag:sea" } });
     type("park bea");

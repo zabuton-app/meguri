@@ -344,6 +344,8 @@ export const en: Catalog = {
   "filter.searchPlaceholder": "Search file name or tags",
   "filter.tagSuggestions": "Tag suggestions",
   "filter.directiveSuggestions": "Search conditions",
+  "filter.prefixWorkspace": "Switch to a workspace",
+  "filter.prefixCollection": "Open a collection",
   "filter.tagElsewhere": "other workspaces only",
   "filter.all": "All",
   "filter.played": "Played",

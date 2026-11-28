@@ -605,6 +605,15 @@ twice (compared by `searchDirectiveKey()`, as `addSearchTokens()` compares a tag
 click); the chip that carries it is highlighted instead. "Search for" runs the
 whole field, chips and text, as the new search.
 
+The field offers every directive (#730). A word that begins a prefix offers it
+under "Search conditions", after the search row so Enter still searches (`ra`
+offers `rating:`, `-ra` offers `-rating:`); picking it leaves it open for a
+value. After a prefix whose values are a fixed few (`has:`, `is:`), those
+values come first and Enter takes one. `ws:` and `col:` are offered for a word
+alone in the field and open their page. What each kind offers is one record,
+`DIRECTIVE_COMPLETIONS` in `src/lib/directiveCompletions.ts`, keyed by the
+directive's kind, so a new kind does not compile until it is decided.
+
 Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;
