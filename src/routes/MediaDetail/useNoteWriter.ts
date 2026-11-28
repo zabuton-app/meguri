@@ -1,14 +1,9 @@
-// Saving a file's note as the user types (NoteCard). The note is written here
-// rather than through useDetailMutations: a write per pause in typing, queued
-// and flushed when the card goes, does not fit a mutation per action.
+// Saving a note as the user types: a file's note (NoteCard) or the note
+// template (Settings, #345). The note is written here rather than through
+// useDetailMutations: a write per pause in typing, queued and flushed when the
+// editor goes, does not fit a mutation per action.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import log from "@/lib/logger";
-import { api } from "@/ipc/client";
-import {
-  invalidateNoteSearches,
-  patchFileDetailInCache,
-} from "@/lib/queryCache";
 import { normalizeNote } from "@shared/note";
 
 /** How long typing has to pause before the note is written. */
@@ -17,16 +12,15 @@ export const SAVE_DELAY_MS = 1000;
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
- * Writes the note for one file. Writes run one at a time; text typed while one
- * is in flight is written right after it, so the last text always lands last.
- * A failed write keeps the text for the next attempt.
+ * Writes one note through `save`. Writes run one at a time; text typed while
+ * one is in flight is written right after it, so the last text always lands
+ * last. A failed write keeps the text for the next attempt.
  */
 export function useNoteWriter(
-  fileId: number,
-  wsId: string,
+  /** Stores the value (null for none); rejects when it could not. */
+  save: (value: string | null) => Promise<void>,
   initial: string | null,
 ) {
-  const qc = useQueryClient();
   /** What the database holds, as far as this view knows. */
   const saved = useRef(normalizeNote(initial));
   /** Text waiting to be written; undefined when there is none. */
@@ -46,12 +40,9 @@ export function useNoteWriter(
       inFlight.current = true;
       setState("saving");
       try {
-        await api.fileSetNote(fileId, wsId, value);
+        await save(value);
         saved.current = value;
         wrote = true;
-        patchFileDetailInCache(qc, wsId, fileId, { note: value });
-        // Only the views filtered by a note can change membership.
-        invalidateNoteSearches(qc);
       } catch (e) {
         log.warn("could not save the note:", e);
         // Newer text typed meanwhile wins; otherwise retry this one.
@@ -65,7 +56,7 @@ export function useNoteWriter(
     // Nothing left to write: a failure shown earlier no longer applies (the
     // text was taken back to what is saved, say).
     setState((s) => (wrote ? "saved" : s === "error" ? "idle" : s));
-  }, [fileId, wsId, qc]);
+  }, [save]);
 
   const schedule = useCallback(
     (value: string | null) => {
