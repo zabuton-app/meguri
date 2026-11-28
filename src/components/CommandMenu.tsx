@@ -69,6 +69,7 @@ import {
 import { useSearchDraft, type SearchDraft } from "@/hooks/useSearchDraft";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import { useTagCompletions } from "@/hooks/useTagCompletions";
+import { useExtCatalog, type ExtCatalog } from "@/hooks/useExtCatalog";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -86,6 +87,7 @@ import {
 import { searchTokenLabel, tagNamespaceLabel } from "@/lib/tagLabel";
 import {
   prefixSuggestions,
+  catalogWanted,
   valueSuggestions,
   type PrefixSuggestion,
 } from "@/lib/directiveCompletions";
@@ -100,7 +102,12 @@ import type { ViewMode } from "@/routes/Home/utils";
 import { formatChords, GRID_BINDINGS } from "@/settings/keybindings";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { useTheme } from "@/themes/ThemeProvider";
-import { MAX_BULK_FILES, TAG_SEARCH_PREFIX } from "@shared/tags";
+import {
+  EXT_SEARCH_PREFIX,
+  MAX_BULK_FILES,
+  parseNegatedSearchToken,
+  TAG_SEARCH_PREFIX,
+} from "@shared/tags";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 interface CommandMenuProps {
@@ -492,9 +499,15 @@ function CommandMenuBody({
     : null;
   const word =
     completing && directiveValue === null ? plainWordAtCaret(draft.text) : null;
-  // The values of a directive with a fixed few (`has:` offers `has:note`),
-  // and the prefixes a word begins (`ra` offers `rating:`) (#730).
-  const fixed = completing ? valueSuggestions(draft.text) : [];
+  // The values of a directive with a fixed few (`has:` offers `has:note`) or
+  // whose values the library holds (`ext:` its extensions, #731), and the
+  // prefixes a word begins (`ra` offers `rating:`) (#730).
+  const extCatalog = useExtCatalog(
+    completing && catalogWanted(draft.text) === "ext",
+  );
+  const fixed = completing
+    ? valueSuggestions(draft.text, { ext: extCatalog.exts })
+    : [];
   const prefixes = completing ? prefixSuggestions(draft.text) : [];
   // The search row: first once the field is edited, and while a search is
   // only shown again too, so Enter on the field as opened (`/` then Enter,
@@ -687,6 +700,7 @@ function CommandMenuBody({
             <DirectiveCompletions
               t={t}
               tokens={fixed}
+              extCatalog={extCatalog}
               draft={draft}
               onPicked={refocus}
             />
@@ -1127,11 +1141,13 @@ function TagCompletions({
 function DirectiveCompletions({
   t,
   tokens,
+  extCatalog,
   draft,
   onPicked,
 }: {
   t: TFunc;
   tokens: string[];
+  extCatalog: ExtCatalog;
   draft: SearchDraft;
   onPicked: () => void;
 }) {
@@ -1142,11 +1158,20 @@ function DirectiveCompletions({
     <CommandGroup heading={t("filter.directiveSuggestions")} forceMount>
       {tokens.map((token) => {
         const colon = token.indexOf(":") + 1;
+        // Only `ext:` values come from the library: they carry a file count,
+        // muted when held only in another workspace, as a tag is (#731).
+        const { body } = parseNegatedSearchToken(token);
+        const ext = body.startsWith(`${EXT_SEARCH_PREFIX}:`)
+          ? extCatalog.summary(token.slice(colon))
+          : undefined;
         return (
           <CommandItem
             key={token}
             forceMount
             value={`complete-directive ${token}`}
+            className={
+              ext && !extCatalog.held(ext.ext) ? "text-muted" : undefined
+            }
             onSelect={() => {
               draft.acceptToken(token);
               onPicked();
@@ -1160,6 +1185,11 @@ function DirectiveCompletions({
             <span className="truncate text-xs text-muted">
               {searchTokenLabel(t, token)}
             </span>
+            {ext && (
+              <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">
+                {ext.fileCount}
+              </span>
+            )}
           </CommandItem>
         );
       })}

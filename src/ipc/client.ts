@@ -199,6 +199,8 @@ export const api = {
    */
   tagsListAll: (opts?: { allWorkspaces: boolean }) =>
     invoke("tags_list_all", opts),
+  /** The extensions of every workspace's files, most first (#731). */
+  extListAll: () => invoke("ext_list_all"),
   tagRename: (from: TagRef, to: string) => invoke("tag_rename", { from, to }),
   tagMerge: (from: TagRef[], into: TagRef) =>
     invoke("tag_merge", { from, into }),

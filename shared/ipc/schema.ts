@@ -433,6 +433,22 @@ export const TagListSchema = z.object({
 });
 export type TagList = z.infer<typeof TagListSchema>;
 
+/** An extension the library's live files have, for `ext:` (#731). */
+export const ExtSummarySchema = z.object({
+  /** Lower-cased, without the dot, as `ext:` compares it. */
+  ext: z.string(),
+  fileCount: z.number().int(),
+  /** The workspaces whose files have it. */
+  workspaceIds: z.array(z.string()),
+});
+export type ExtSummary = z.infer<typeof ExtSummarySchema>;
+
+export const ExtListSchema = z.object({
+  /** Most files first. */
+  extensions: z.array(ExtSummarySchema),
+});
+export type ExtList = z.infer<typeof ExtListSchema>;
+
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
   // Number when produced by the per-DB offset path; keyset object from the

@@ -85,6 +85,7 @@ export const INVOKE_CHANNELS = [
   "file_remove_tag",
   "tags_list",
   "tags_list_all",
+  "ext_list_all",
   "tag_rename",
   "tag_merge",
   "tag_delete",

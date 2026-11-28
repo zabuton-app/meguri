@@ -31,7 +31,15 @@ export interface DirectiveCompletion {
   label: TranslationKey;
   /** The values offered after the colon, when they are a fixed few. */
   values?: readonly string[];
+  /** Where the values come from when the library holds them (#731). */
+  catalog?: Catalog;
 }
+
+/** The lists of values read from the library, by what they complete. */
+export type Catalog = "ext";
+
+/** How many values read from the library are offered at once. */
+const MAX_CATALOG_VALUES = 10;
 
 const NUMERIC_LABELS: Record<NumericSearchField, TranslationKey> = {
   size: "filter.sizeChip",
@@ -46,7 +54,7 @@ export const DIRECTIVE_COMPLETIONS: Record<
 > = {
   tag: [{ prefix: TAG_SEARCH_PREFIX, label: "media.tags" }],
   hash: [{ prefix: HASH_SEARCH_PREFIX, label: "filter.hashChip" }],
-  ext: [{ prefix: EXT_SEARCH_PREFIX, label: "filter.extChip" }],
+  ext: [{ prefix: EXT_SEARCH_PREFIX, label: "filter.extChip", catalog: "ext" }],
   numeric: NUMERIC_SEARCH_FIELDS.map((field) => ({
     prefix: field,
     label: NUMERIC_LABELS[field],
@@ -91,25 +99,53 @@ function typedTail(draft: string): string | null {
   return splitSearchTokens(draft).at(-1) ?? null;
 }
 
-/**
- * The fixed values the directive at the end of the draft can take, from what
- * is typed after its colon (`has:` and `has:n` offer `has:note`), negated when
- * it is.
- */
-export function valueSuggestions(draft: string): string[] {
+/** The directive being typed at the end of the draft, split at its colon. */
+function typedDirective(draft: string): {
+  entry: DirectiveCompletion;
+  negated: boolean;
+  partial: string;
+} | null {
   const tail = typedTail(draft);
-  if (tail === null) return [];
+  if (tail === null) return null;
   const { negated, body } = parseNegatedSearchToken(tail);
   const typed = body.toLowerCase();
   const colon = typed.indexOf(":");
-  if (colon < 0) return [];
+  if (colon < 0) return null;
   const prefix = typed.slice(0, colon);
-  const partial = typed.slice(colon + 1);
-  const values = ALL.find((c) => c.prefix === prefix)?.values ?? [];
+  const entry = ALL.find((c) => c.prefix === prefix);
+  return entry ? { entry, negated, partial: typed.slice(colon + 1) } : null;
+}
+
+/**
+ * Which list from the library the directive at the end of the draft needs for
+ * its values (`ext:` the extensions), so it is read only then; null otherwise.
+ */
+export function catalogWanted(draft: string): Catalog | null {
+  return typedDirective(draft)?.entry.catalog ?? null;
+}
+
+/**
+ * The values the directive at the end of the draft can take, from what is
+ * typed after its colon (`has:` and `has:n` offer `has:note`), negated when it
+ * is. A directive whose values the library holds takes them from `catalogs`,
+ * in the order given, at most MAX_CATALOG_VALUES.
+ */
+export function valueSuggestions(
+  draft: string,
+  catalogs: Partial<Record<Catalog, readonly string[]>> = {},
+): string[] {
+  const typed = typedDirective(draft);
+  if (typed === null) return [];
+  const { entry, negated } = typed;
+  // `ext:` reads `.mp4` as `mp4` (parseExtSearchToken), so a dot narrows alike.
+  const partial =
+    entry.catalog === "ext" ? typed.partial.replace(/^\./, "") : typed.partial;
+  const values = entry.values ?? (entry.catalog ? catalogs[entry.catalog] : []);
   const not = negated ? SEARCH_NOT : "";
-  return values
+  return (values ?? [])
     .filter((value) => value.startsWith(partial))
-    .map((value) => `${not}${prefix}:${value}`);
+    .slice(0, entry.catalog ? MAX_CATALOG_VALUES : undefined)
+    .map((value) => `${not}${entry.prefix}:${value}`);
 }
 
 export interface PrefixSuggestion {

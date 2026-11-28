@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DIRECTIVE_COMPLETIONS,
+  catalogWanted,
   prefixSuggestions,
   valueSuggestions,
 } from "@/lib/directiveCompletions";
@@ -39,6 +40,39 @@ describe("valueSuggestions", () => {
     expect(valueSuggestions("tag:")).toEqual([]);
     expect(valueSuggestions("has: ")).toEqual([]);
     expect(valueSuggestions("")).toEqual([]);
+  });
+
+  it("offers the library's extensions after ext:, in the order given (#731)", () => {
+    const ext = ["mp4", "mkv", "png"];
+    expect(valueSuggestions("ext:", { ext })).toEqual([
+      "ext:mp4",
+      "ext:mkv",
+      "ext:png",
+    ]);
+    expect(valueSuggestions("sunset EXT:M", { ext })).toEqual([
+      "ext:mp4",
+      "ext:mkv",
+    ]);
+    // `ext:` reads a leading dot as no dot, so typing one narrows the same.
+    expect(valueSuggestions("ext:.p", { ext })).toEqual(["ext:png"]);
+    expect(valueSuggestions("-ext:", { ext })).toEqual([
+      "-ext:mp4",
+      "-ext:mkv",
+      "-ext:png",
+    ]);
+  });
+
+  it("offers at most ten extensions", () => {
+    const ext = Array.from({ length: 12 }, (_, i) => `e${i}`);
+    expect(valueSuggestions("ext:", { ext })).toHaveLength(10);
+  });
+
+  it("says which directive's values come from the library (#731)", () => {
+    expect(catalogWanted("ext:")).toBe("ext");
+    expect(catalogWanted("sunset -ext:m")).toBe("ext");
+    expect(catalogWanted("ext")).toBeNull();
+    expect(catalogWanted("has:")).toBeNull();
+    expect(catalogWanted("ext: ")).toBeNull();
   });
 
   it("offers no values for a directive whose value is free", () => {

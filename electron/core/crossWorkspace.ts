@@ -47,6 +47,8 @@ import type {
   SearchResult,
   SearchSeekKey,
   TagList,
+  ExtList,
+  ExtSummary,
   TagSummary,
 } from "./types.js";
 
@@ -695,6 +697,36 @@ export function listHistoryWorkspaces(
 /** Bucketing key: hash and size must both match to count as a duplicate. */
 function dupKey(hash: string, size: number): string {
   return `${hash}\u0000${size}`;
+}
+
+/**
+ * The extensions the live files of a set of workspaces have, with how many
+ * files have each and which workspaces hold them, most files first, for `ext:`
+ * (#731). Files without an extension are left out: `ext:` cannot name them.
+ * `ext` has no index, so this reads every live file of each workspace.
+ */
+export function listExtensionsWorkspaces(cores: CoreTarget[]): ExtList {
+  const merged = new Map<string, ExtSummary>();
+  for (const { id, core } of cores) {
+    const rows = core.db
+      .prepare(
+        "SELECT ext, COUNT(*) AS n FROM files WHERE deleted_at IS NULL AND ext IS NOT NULL AND ext <> '' GROUP BY ext",
+      )
+      .all() as { ext: string; n: number }[];
+    for (const { ext, n } of rows) {
+      const entry = merged.get(ext);
+      if (entry) {
+        entry.fileCount += n;
+        entry.workspaceIds.push(id);
+      } else {
+        merged.set(ext, { ext, fileCount: n, workspaceIds: [id] });
+      }
+    }
+  }
+  const extensions = [...merged.values()].sort(
+    (a, b) => b.fileCount - a.fileCount || a.ext.localeCompare(b.ext),
+  );
+  return { extensions };
 }
 
 /**

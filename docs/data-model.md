@@ -614,6 +614,14 @@ alone in the field and open their page. What each kind offers is one record,
 `DIRECTIVE_COMPLETIONS` in `src/lib/directiveCompletions.ts`, keyed by the
 directive's kind, so a new kind does not compile until it is decided.
 
+`ext:` takes its values from the library (#731): `ext_list_all` counts every
+workspace's live files per extension (query kind `extensions`). The field
+offers up to ten, those the view holds first and then by file count, the rest
+muted as a tag held only elsewhere is. The list is read only once `ext:` is
+typed, kept a minute, and read again where the tag catalog is: after a scan,
+when a workspace is removed and when missing files are removed. `ext` has no
+index, so the count reads every live file; about 15 ms for 100,000 files.
+
 Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;

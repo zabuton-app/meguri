@@ -13,6 +13,7 @@ import {
 import {
   filesByIdsWorkspaces,
   listHistoryWorkspaces,
+  listExtensionsWorkspaces,
   listTagsWorkspaces,
   searchCollection,
   searchWorkspaces,
@@ -634,6 +635,34 @@ describe("searchCollection k-way merge", () => {
 
 // The cap cases seed a couple of thousand manual tags one at a time, which takes
 // several seconds on a CI runner, so they get more than the default 5s.
+describe("listExtensionsWorkspaces (#731)", () => {
+  it("counts live files per extension across workspaces, most first", () => {
+    const a = newDb();
+    const b = newDb();
+    try {
+      insertFile(a.db, a.rootId, { relPath: "a1.mp4" });
+      insertFile(a.db, a.rootId, { relPath: "a2.mp4" });
+      const gone = insertFile(a.db, a.rootId, { relPath: "gone.mkv" });
+      a.db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(gone);
+      insertFile(a.db, a.rootId, { relPath: "README", ext: "" });
+      insertFile(b.db, b.rootId, { relPath: "b1.mp4" });
+      insertFile(b.db, b.rootId, { relPath: "b2.png", kind: "image" });
+
+      const res = listExtensionsWorkspaces([
+        coreTarget("w1", a.db),
+        coreTarget("w2", b.db),
+      ]);
+      expect(res.extensions).toEqual([
+        { ext: "mp4", fileCount: 3, workspaceIds: ["w1", "w2"] },
+        { ext: "png", fileCount: 1, workspaceIds: ["w2"] },
+      ]);
+    } finally {
+      a.db.close();
+      b.db.close();
+    }
+  });
+});
+
 describe("listTagsWorkspaces", { timeout: 15_000 }, () => {
   /** One file carrying `manualCount` manual tags plus every given generated tag. */
   function seedTags(

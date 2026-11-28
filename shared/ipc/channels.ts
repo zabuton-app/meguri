@@ -22,6 +22,7 @@ import type {
   SearchResult,
   StoredSmartCollections,
   TagList,
+  ExtList,
   UpdateInfo,
   UserCollection,
   WorkspaceStats,
@@ -506,6 +507,7 @@ export const ChannelInputs = {
   // The whole library on request: the search box completes a tag from every
   // workspace, so a tag held elsewhere can be found and said to be elsewhere.
   tags_list_all: z.object({ allWorkspaces: z.boolean() }).optional(),
+  ext_list_all: z.void(),
   tag_rename: z.object({
     from: TagRefSchema,
     /** New plain name; the namespace is always "" since only manual tags are editable. */
@@ -780,6 +782,8 @@ export interface ChannelOutputs {
   files_by_ids: FileRow[];
   tags_list: string[];
   tags_list_all: TagList;
+  // The extensions of every workspace's files, for `ext:` (#731).
+  ext_list_all: ExtList;
   // The counters below are summed over the databases in scope, so in the "All"
   // view a tag present in three workspaces reports removedTags: 3 for one
   // logical tag, and a file shared between workspaces is counted once per

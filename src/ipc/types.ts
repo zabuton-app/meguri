@@ -30,6 +30,7 @@ export type {
   TagRef,
   TagSourceCount,
   TagSummary,
+  ExtSummary,
   ThumbDone,
   UserCollection,
   UserCollectionItem,

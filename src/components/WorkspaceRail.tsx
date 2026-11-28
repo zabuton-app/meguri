@@ -59,6 +59,7 @@ import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
+import { EXT_CATALOG_QUERY_KEY } from "@/hooks/useExtCatalog";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
 import type { DraggedFile } from "@/lib/fileDrag";
@@ -219,6 +220,7 @@ export function WorkspaceRail() {
       // Tags held only by the workspace that went are no longer there to
       // complete (a switch leaves the catalog as it is).
       void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      void qc.invalidateQueries({ queryKey: EXT_CATALOG_QUERY_KEY });
       void refreshAll();
     },
   });
