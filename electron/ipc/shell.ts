@@ -1,6 +1,6 @@
 import { clipboard, nativeImage, shell } from "electron";
 import { spawn } from "node:child_process";
-import { statSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
 import { folderDirInsideRoot, folderPathUnderRoot } from "../core/paths.js";
@@ -31,27 +31,28 @@ export function openDetached(target: string): void {
 export function registerShellHandlers(ctx: IpcContext): void {
   const { ws } = ctx;
 
-  handle("open_external", ({ id, workspaceId }) => {
+  handle("open_external", async ({ id, workspaceId }) => {
     const c = coreById(ws, workspaceId);
-    const abs = ensureFileInsideRoot(c, id);
+    const abs = await ensureFileInsideRoot(c, id);
     openDetached(abs);
     q.recordPlay(c.db, id, "external", null);
     ws.removeFromWatchLater(workspaceId, id);
   });
 
-  handle("open_folder", ({ id, workspaceId }) => {
-    const abs = ensureFileInsideRoot(coreById(ws, workspaceId), id);
+  handle("open_folder", async ({ id, workspaceId }) => {
+    const abs = await ensureFileInsideRoot(coreById(ws, workspaceId), id);
     shell.showItemInFolder(abs);
   });
 
-  handle("drag_files", (targets, event) => {
-    const files = bulkTargetCores(ws, targets).flatMap(({ core, fileIds }) =>
-      fileIds.map((id) => {
-        const file = ensureFileInsideRoot(core, id);
-        if (!statSync(file).isFile()) throw new Error("file not found");
-        return file;
-      }),
-    );
+  handle("drag_files", async (targets, event) => {
+    const files: string[] = [];
+    for (const { core, fileIds } of bulkTargetCores(ws, targets)) {
+      for (const id of fileIds) {
+        const file = await ensureFileInsideRoot(core, id);
+        if (!(await stat(file)).isFile()) throw new Error("file not found");
+        files.push(file);
+      }
+    }
     // Resolve the entire selection before starting the OS drag. A stale or
     // out-of-root entry must not silently turn this into a partial drag.
     const icon = nativeImage.createFromBuffer(
@@ -71,7 +72,7 @@ export function registerShellHandlers(ctx: IpcContext): void {
   // show; the detached spawn elsewhere cannot report back and only logs.
   handle("folder_open_in_file_manager", async ({ workspaceId, path }) => {
     const c = coreById(ws, workspaceId);
-    const dir = folderDirInsideRoot(c.root, path);
+    const dir = await folderDirInsideRoot(c.root, path);
     if (!dir) throw new Error("folder not found");
     if (process.platform === "win32") {
       const error = await shell.openPath(dir);
@@ -87,12 +88,13 @@ export function registerShellHandlers(ctx: IpcContext): void {
   // failure reaches the renderer instead of going unhandled.
   handle("folder_copy_path", async ({ workspaceId, path }) => {
     const c = coreById(ws, workspaceId);
-    if (!folderDirInsideRoot(c.root, path)) throw new Error("folder not found");
+    if (!(await folderDirInsideRoot(c.root, path)))
+      throw new Error("folder not found");
     await clipboard.writeText(folderPathUnderRoot(c.root, path));
   });
 
   handle("copy_file_path", async ({ id, workspaceId }) => {
-    const abs = ensureFileInsideRoot(coreById(ws, workspaceId), id);
+    const abs = await ensureFileInsideRoot(coreById(ws, workspaceId), id);
     await clipboard.writeText(abs);
   });
 

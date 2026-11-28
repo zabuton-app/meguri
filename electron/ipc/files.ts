@@ -86,7 +86,7 @@ export function registerFileHandlers(ctx: IpcContext): void {
       file?.kind === "video" &&
       file.meta == null &&
       isRemuxedVideo(file.codec, file.ext) &&
-      isInsideRoot(file.absPath, root)
+      (await isInsideRoot(file.absPath, root))
     ) {
       // Before the scan stores metadata, opening details waits for the shared
       // playback probe: a free slot, then up to five seconds of ffprobe.
@@ -109,7 +109,7 @@ export function registerFileHandlers(ctx: IpcContext): void {
     const core = coreById(ws, workspaceId);
     const file = q.fileDetail(core.db, id);
     if (file?.kind !== "video") throw new Error("Unsupported subtitle track");
-    const abs = ensureFileInsideRoot(core, id);
+    const abs = await ensureFileInsideRoot(core, id);
     const selected = readEmbeddedTracks(file.meta, "subtitle")[track];
     if (!selected || !isTextSubtitle(selected.codec))
       throw new Error("Unsupported subtitle track");

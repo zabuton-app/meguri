@@ -61,7 +61,7 @@ describe("backupDbPathForDataDir", () => {
 describe("isInsideRoot", () => {
   it.skipIf(process.platform !== "darwin")(
     "checks the on-disk directory when the root and file use different casing",
-    () => {
+    async () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
       const root = path.join(dir, "Meguri");
       const alternate = path.join(dir, "meguri");
@@ -72,34 +72,34 @@ describe("isInsideRoot", () => {
         const file = path.join(alternate, "thumb.webp");
         fs.writeFileSync(file, "thumbnail");
 
-        expect(isInsideRoot(file, root)).toBe(aliases);
+        expect(await isInsideRoot(file, root)).toBe(aliases);
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }
     },
   );
 
-  it("accepts paths inside the root", () => {
+  it("accepts paths inside the root", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     const file = path.join(root, "a.mp4");
     fs.writeFileSync(file, "x");
     try {
-      expect(isInsideRoot(file, root)).toBe(true);
-      expect(isInsideRoot(root, root)).toBe(true);
+      expect(await isInsideRoot(file, root)).toBe(true);
+      expect(await isInsideRoot(root, root)).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("rejects sibling prefixes and paths that normalize outside the root", () => {
+  it("rejects sibling prefixes and paths that normalize outside the root", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     const sibling = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-sib-"));
     const siblingFile = path.join(sibling, "a.mp4");
     fs.writeFileSync(siblingFile, "x");
     try {
-      expect(isInsideRoot(siblingFile, root)).toBe(false);
+      expect(await isInsideRoot(siblingFile, root)).toBe(false);
       expect(
-        isInsideRoot(
+        await isInsideRoot(
           path.join(root, "..", path.basename(sibling), "a.mp4"),
           root,
         ),
@@ -112,7 +112,7 @@ describe("isInsideRoot", () => {
 
   it.skipIf(!CAN_SYMLINK)(
     "rejects symlinks whose target lies outside the root",
-    () => {
+    async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
       const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
       const target = path.join(outside, "secret.txt");
@@ -120,7 +120,7 @@ describe("isInsideRoot", () => {
       fs.writeFileSync(target, "secret");
       fs.symlinkSync(target, link);
       try {
-        expect(isInsideRoot(link, root)).toBe(false);
+        expect(await isInsideRoot(link, root)).toBe(false);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
         fs.rmSync(outside, { recursive: true, force: true });
@@ -130,39 +130,62 @@ describe("isInsideRoot", () => {
 
   it.skipIf(!CAN_SYMLINK)(
     "accepts symlinks whose target stays inside the root",
-    () => {
+    async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
       const target = path.join(root, "real.txt");
       const link = path.join(root, "link.txt");
       fs.writeFileSync(target, "ok");
       fs.symlinkSync(target, link);
       try {
-        expect(isInsideRoot(link, root)).toBe(true);
+        expect(await isInsideRoot(link, root)).toBe(true);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
     },
   );
 
-  it("returns false when the path does not exist", () => {
+  it("returns false when the path does not exist", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     try {
-      expect(isInsideRoot(path.join(root, "missing.mp4"), root)).toBe(false);
+      expect(await isInsideRoot(path.join(root, "missing.mp4"), root)).toBe(
+        false,
+      );
     } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // A synchronous realpath on a root on a network share would block the main
+  // process on every IPC call that checks a path (#687).
+  it("resolves the paths without a synchronous realpath", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
+    fs.mkdirSync(path.join(root, "dir"));
+    const file = path.join(root, "a.mp4");
+    fs.writeFileSync(file, "x");
+    const native = vi.spyOn(fs.realpathSync, "native");
+    const sync = vi.spyOn(fs, "realpathSync");
+    try {
+      expect(await isInsideRoot(file, root)).toBe(true);
+      expect(await folderDirInsideRoot(root, "dir")).not.toBeNull();
+      expect(sync).not.toHaveBeenCalled();
+      expect(native).not.toHaveBeenCalled();
+    } finally {
+      sync.mockRestore();
+      native.mockRestore();
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 });
 
 describe("folderDirInsideRoot", () => {
-  it("resolves a folder path to its directory, the root included", () => {
+  it("resolves a folder path to its directory, the root included", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     fs.mkdirSync(path.join(root, "Movie", "2024"), { recursive: true });
     try {
       // Canonical paths: the tmp dir itself may sit behind a symlink.
       const real = fs.realpathSync(root);
-      expect(folderDirInsideRoot(root, "")).toBe(real);
-      expect(folderDirInsideRoot(root, "Movie/2024")).toBe(
+      expect(await folderDirInsideRoot(root, "")).toBe(real);
+      expect(await folderDirInsideRoot(root, "Movie/2024")).toBe(
         path.join(real, "Movie", "2024"),
       );
     } finally {
@@ -170,36 +193,36 @@ describe("folderDirInsideRoot", () => {
     }
   });
 
-  it("refuses what is missing or is not a directory", () => {
+  it("refuses what is missing or is not a directory", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     fs.writeFileSync(path.join(root, "a.mp4"), "x");
     try {
-      expect(folderDirInsideRoot(root, "Gone")).toBeNull();
-      expect(folderDirInsideRoot(root, "a.mp4")).toBeNull();
+      expect(await folderDirInsideRoot(root, "Gone")).toBeNull();
+      expect(await folderDirInsideRoot(root, "a.mp4")).toBeNull();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
   // A directory link, so no symlink privilege is needed anywhere (linkDirSync).
-  it("refuses a link that leads outside", () => {
+  it("refuses a link that leads outside", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
     linkDirSync(outside, path.join(root, "escape"));
     try {
-      expect(folderDirInsideRoot(root, "escape")).toBeNull();
+      expect(await folderDirInsideRoot(root, "escape")).toBeNull();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
       fs.rmSync(outside, { recursive: true, force: true });
     }
   });
 
-  it("returns the link's target for a link that stays inside", () => {
+  it("returns the link's target for a link that stays inside", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     fs.mkdirSync(path.join(root, "real"));
     linkDirSync(path.join(root, "real"), path.join(root, "alias"));
     try {
-      expect(folderDirInsideRoot(root, "alias")).toBe(
+      expect(await folderDirInsideRoot(root, "alias")).toBe(
         path.join(fs.realpathSync(root), "real"),
       );
     } finally {
@@ -207,13 +230,13 @@ describe("folderDirInsideRoot", () => {
     }
   });
 
-  it("refuses Windows separators and drive/stream colons in a segment", () => {
+  it("refuses Windows separators and drive/stream colons in a segment", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     try {
-      expect(folderDirInsideRoot(root, "a\\..\\b", "\\")).toBeNull();
-      expect(folderDirInsideRoot(root, "C:", "\\")).toBeNull();
+      expect(await folderDirInsideRoot(root, "a\\..\\b", "\\")).toBeNull();
+      expect(await folderDirInsideRoot(root, "C:", "\\")).toBeNull();
       expect(
-        folderDirInsideRoot(root, "dir::$INDEX_ALLOCATION", "\\"),
+        await folderDirInsideRoot(root, "dir::$INDEX_ALLOCATION", "\\"),
       ).toBeNull();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

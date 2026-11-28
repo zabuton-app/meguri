@@ -1,7 +1,7 @@
 // What file_photo_details returns for a file id (#725).
 import type { DB } from "./db.js";
 import { readPhotoDetails } from "./exif.js";
-import { isInsideRealRoot, realpathForRootCheck } from "./paths.js";
+import { isInsideRoot } from "./paths.js";
 import { absPathOf } from "./tags.js";
 import type { PhotoDetailsResult } from "../../shared/photoInfo.js";
 
@@ -23,18 +23,6 @@ export async function photoDetailsOf(
   if (kind !== "image") return null;
   const abs = absPathOf(core.db, id);
   if (!abs) return null;
-  // Resolved asynchronously, as the media server does: a share that stopped
-  // answering would block the main process in a synchronous realpath.
-  let inside: boolean;
-  try {
-    const [realAbs, realRoot] = await Promise.all([
-      realpathForRootCheck(abs),
-      realpathForRootCheck(core.root),
-    ]);
-    inside = isInsideRealRoot(realAbs, realRoot);
-  } catch {
-    inside = false;
-  }
-  if (!inside) return { status: "unreadable" };
+  if (!(await isInsideRoot(abs, core.root))) return { status: "unreadable" };
   return readPhotoDetails(abs);
 }

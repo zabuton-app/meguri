@@ -40,7 +40,8 @@ export async function readDownloadOrigin(
   if (!release) return [];
   try {
     const abs = await realpath(absPath);
-    if (!isInsideRoot(abs, root) || !(await stat(abs)).isFile()) return [];
+    if (!(await isInsideRoot(abs, root)) || !(await stat(abs)).isFile())
+      return [];
 
     const options = { signal, maxBuffer };
     const { stdout } = await run(

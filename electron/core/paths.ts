@@ -46,23 +46,23 @@ export function backupDbPathForDataDir(dataDir: string): string {
  * Whether an absolute path lies inside (or is equal to) a normalized root directory.
  * Plain `abs.startsWith(root)` would let "/home/u/videos2/x" match root "/home/u/videos".
  * Symlinks are resolved so a path under root that points outside is rejected.
- * Drive-root edge case ("C:\\") already ends with a separator, so don't double up.
+ * Resolved asynchronously: IPC handlers call this on the main process, and a
+ * synchronous realpath on a root on a network share or a sleeping disk would
+ * stall IPC, the media server and the tray until it answers (#687).
  */
-export function isInsideRoot(abs: string, root: string): boolean {
-  let realAbs: string;
-  let realRoot: string;
+export async function isInsideRoot(
+  abs: string,
+  root: string,
+): Promise<boolean> {
   try {
-    // On macOS the JS realpath can preserve different spellings of the same
-    // path. Native realpath returns the spelling on disk, including on
-    // case-sensitive volumes where differently cased folders are distinct.
-    const realpath =
-      process.platform === "darwin" ? fs.realpathSync.native : fs.realpathSync;
-    realAbs = realpath(abs);
-    realRoot = realpath(root);
+    const [realAbs, realRoot] = await Promise.all([
+      realpathForRootCheck(abs),
+      realpathForRootCheck(root),
+    ]);
+    return isInsideRealRoot(realAbs, realRoot);
   } catch {
     return false;
   }
-  return isInsideRealRoot(realAbs, realRoot);
 }
 
 /**
@@ -71,8 +71,11 @@ export function isInsideRoot(abs: string, root: string): boolean {
  * network share.
  */
 export function realpathForRootCheck(p: string): Promise<string> {
-  // The same resolution as isInsideRoot: native on macOS (fs.promises.realpath
-  // has fs.realpath.native's semantics), the JS realpath elsewhere.
+  // On macOS the JS realpath can preserve different spellings of the same
+  // path. Native realpath (fs.promises.realpath has fs.realpath.native's
+  // semantics) returns the spelling on disk, including on case-sensitive
+  // volumes where differently cased folders are distinct. The JS realpath
+  // elsewhere.
   return process.platform === "darwin"
     ? fs.promises.realpath(p)
     : realpathJs(p);
@@ -80,7 +83,7 @@ export function realpathForRootCheck(p: string): Promise<string> {
 
 /**
  * isInsideRoot's comparison, for a path and a root already resolved the way
- * isInsideRoot resolves them (realpathForRootCheck, when done asynchronously).
+ * isInsideRoot resolves them (realpathForRootCheck).
  */
 export function isInsideRealRoot(realAbs: string, realRoot: string): boolean {
   let normalizedAbs = realAbs;
@@ -121,22 +124,19 @@ export function folderPathUnderRoot(root: string, folder: string): string {
  * so the "/"-only folder syntax would pass them, yet path.join would read them
  * as separators or a drive/stream. `sep` is injectable for tests.
  */
-export function folderDirInsideRoot(
+export async function folderDirInsideRoot(
   root: string,
   folder: string,
   sep: string = path.sep,
-): string | null {
+): Promise<string | null> {
   const segments = folder === "" ? [] : folder.split("/");
   if (sep === "\\" && segments.some((s) => /[\\:]/.test(s))) return null;
-  let real: string;
+  // Asynchronous throughout, like isInsideRoot: a folder on an unresponsive
+  // share must not stall the main process.
   try {
-    real = fs.realpathSync(folderPathUnderRoot(root, folder));
-  } catch {
-    return null;
-  }
-  if (!isInsideRoot(real, root)) return null;
-  try {
-    return fs.statSync(real).isDirectory() ? real : null;
+    const real = await realpathJs(folderPathUnderRoot(root, folder));
+    if (!(await isInsideRoot(real, root))) return null;
+    return (await fs.promises.stat(real)).isDirectory() ? real : null;
   } catch {
     return null;
   }
