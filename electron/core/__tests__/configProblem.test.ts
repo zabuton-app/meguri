@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { writeStoredSettings } from "./storedSettings.js";
 
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
@@ -149,6 +150,27 @@ describe("settings that cannot be opened mid-session", () => {
       expect(() =>
         c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" })),
       ).not.toThrow();
+    } finally {
+      fs.mkdirSync(userData, { recursive: true }); // for afterEach
+    }
+  });
+});
+
+describe("settings that cannot be read right after opening (#734)", () => {
+  it("serves what is stored, not the defaults, when the first read fails", async () => {
+    writeStoredSettings(userData, {
+      roots: ["/media"],
+      noteTemplate: "## Source",
+    });
+    const c = await freshConfig();
+    expect(c.configLoadProblem()).toBeNull(); // the library opened
+
+    // Gone before anything read the settings: a read served as the defaults
+    // here would have a later whole-field write replace what is stored.
+    fs.rmSync(userData, { recursive: true, force: true });
+    try {
+      expect(c.loadConfig().roots).toEqual(["/media"]);
+      expect(c.loadConfig().noteTemplate).toBe("## Source");
     } finally {
       fs.mkdirSync(userData, { recursive: true }); // for afterEach
     }

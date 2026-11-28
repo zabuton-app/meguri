@@ -341,6 +341,12 @@ that does not validate falls back to its default without taking the others
 with it. `updateConfig()` writes only the fields a change touched, in one
 transaction.
 
+The settings are read once when the library is opened at startup. If that
+read fails, the app runs on the defaults and writes no setting for the
+session, as when the library cannot be opened at all. A read that fails later
+serves the settings as last read, never the defaults, so a write made from
+them cannot replace what is stored with defaults (#734).
+
 They used to live in `<userData>/config.json`. A launch that finds no import
 record (`_config_json_imported_at`) imports it, over whatever `app_settings`
 holds, and records the import in the same transaction; the file is then left
