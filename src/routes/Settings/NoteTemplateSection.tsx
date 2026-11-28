@@ -5,6 +5,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { api } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useNoteTemplate } from "@/hooks/useNoteTemplate";
+import { LoadError } from "@/components/LoadError";
 import { useNoteWriter } from "@/routes/MediaDetail/useNoteWriter";
 import {
   noteExtensions,
@@ -17,7 +18,7 @@ import { NOTE_MAX_CHARS } from "@shared/note";
 
 export function NoteTemplateSection() {
   const { t } = useI18n();
-  const { template, loaded } = useNoteTemplate();
+  const { template, loaded, failed, retry, retrying } = useNoteTemplate();
   return (
     <section className="flex flex-col gap-3 border-b border-border py-3">
       <div className="flex flex-col">
@@ -30,6 +31,14 @@ export function NoteTemplateSection() {
       </div>
       {/* Created once the stored template is in, so it starts from it. */}
       {loaded && <TemplateEditor initial={template} />}
+      {failed && (
+        <LoadError
+          message={t("settings.noteTemplateLoadFailed")}
+          onRetry={retry}
+          retrying={retrying}
+          className="py-6"
+        />
+      )}
     </section>
   );
 }

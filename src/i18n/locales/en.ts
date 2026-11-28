@@ -57,6 +57,8 @@ export const en: Catalog = {
   "settings.noteTemplate": "Note template",
   "settings.noteTemplateDesc":
     "A new note starts from this. Notes already written are not changed. Leave it empty to start notes blank.",
+  "settings.noteTemplateLoadFailed":
+    "Could not load the note template. Please try again.",
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",

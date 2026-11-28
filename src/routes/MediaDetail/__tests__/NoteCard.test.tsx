@@ -211,7 +211,7 @@ describe("NoteCard with a note template (#345)", () => {
     expect(screen.queryByRole("heading", { name: "Source" })).toBeNull();
   });
 
-  it("stores a note cleared back to the template as no note", async () => {
+  it("keeps a note once it was changed, even when changed back to the template", async () => {
     renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
       queryClient: withTemplate(TEMPLATE),
     });
@@ -221,13 +221,20 @@ describe("NoteCard with a note template (#345)", () => {
     await waitFor(() => expect(mocks.fileSetNote).toHaveBeenCalledTimes(1), {
       timeout: 3000,
     });
+    // The first change made it a note: going back to the template text keeps
+    // it, as any other edit would.
     act(() => {
       editorOf().commands.undo();
     });
-    await waitFor(
-      () => expect(mocks.fileSetNote).toHaveBeenLastCalledWith(7, "ws", null),
-      { timeout: 3000 },
-    );
+    await waitFor(() => expect(mocks.fileSetNote).toHaveBeenCalledTimes(2), {
+      timeout: 3000,
+    });
+    const [, , saved] = mocks.fileSetNote.mock.calls[1] as [
+      number,
+      string,
+      string | null,
+    ];
+    expect(saved).toMatch(/^## Source\s+## Licence\s*$/);
   });
 
   it("uses the template as it is when the note is started", async () => {

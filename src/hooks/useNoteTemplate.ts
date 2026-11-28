@@ -10,13 +10,18 @@ export function useNoteTemplate(): {
   /** The template as Markdown, "" for none or while it loads. */
   template: string;
   loaded: boolean;
+  /** It could not be read, even after the app's retry. */
+  failed: boolean;
+  /** Read it again, after a failure. */
+  retry: () => void;
+  retrying: boolean;
   /** Put a template main has stored into the cache (no IPC). */
   setTemplate: (next: string) => void;
 } {
   const qc = useQueryClient();
   // Only Settings changes it, through setTemplate, so the cached value never
   // goes stale on its own.
-  const { data } = useQuery({
+  const { data, isError, isFetching, refetch } = useQuery({
     queryKey: NOTE_TEMPLATE_QUERY_KEY,
     queryFn: () => api.noteTemplateGet(),
     staleTime: Infinity,
@@ -25,5 +30,12 @@ export function useNoteTemplate(): {
     (next: string) => qc.setQueryData(NOTE_TEMPLATE_QUERY_KEY, next),
     [qc],
   );
-  return { template: data ?? "", loaded: data !== undefined, setTemplate };
+  return {
+    template: data ?? "",
+    loaded: data !== undefined,
+    failed: isError && data === undefined,
+    retry: () => void refetch(),
+    retrying: isFetching,
+    setTemplate,
+  };
 }

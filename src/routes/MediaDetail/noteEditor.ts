@@ -99,7 +99,6 @@ export interface NoteMarks extends ActiveMarks {
   chars: number;
 }
 
-/** What the toolbar and the character count show, kept up to date. */
 /**
  * Where to put the caret in a note just started from the template (#345):
  * inside its first empty line, so writing starts under the first heading.
@@ -124,6 +123,7 @@ export function noteOf(editor: Editor, started: string | null): string | null {
   return note !== null && note === started ? null : note;
 }
 
+/** What the toolbar and the character count show, kept up to date. */
 export function useNoteMarks(editor: Editor): NoteMarks {
   return useEditorState({
     editor,

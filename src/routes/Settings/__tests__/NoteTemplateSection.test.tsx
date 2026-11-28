@@ -93,6 +93,21 @@ describe("NoteTemplateSection", () => {
     expect(document.activeElement).not.toBe(field);
   });
 
+  it("shows an error with a retry when the template cannot be loaded", async () => {
+    // The app retries a failed read once (createRendererQueryClient); the
+    // test client does not, so this is what is left after that retry.
+    mocks.noteTemplateGet.mockRejectedValueOnce(new Error("locked"));
+    renderWithProviders(<NoteTemplateSection />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Could not load the note template. Please try again.",
+    );
+    mocks.noteTemplateGet.mockResolvedValue("## Source");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "Source" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("keeps the text and offers a retry when saving fails", async () => {
     mocks.noteTemplateSet.mockRejectedValueOnce(new Error("disk full"));
     renderWithProviders(<NoteTemplateSection />);

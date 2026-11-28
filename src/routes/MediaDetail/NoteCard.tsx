@@ -66,8 +66,8 @@ export default function NoteCard({
   const contentRef = useRef<HTMLDivElement>(null);
   const { template } = useNoteTemplate();
   // A note just started from the template (#345): the template as the editor
-  // wrote it back, which counts as no note until something is typed, and
-  // where the caret goes. Null otherwise.
+  // wrote it back, which counts as no note until it is first changed, and
+  // where the caret goes. Null otherwise, and once changed.
   const started = useRef<string | null>(null);
   const caret = useRef<number | null>(null);
 
@@ -103,7 +103,13 @@ export default function NoteCard({
         },
         handleDOMEvents: { click: noteLinkClick },
       },
-      onUpdate: ({ editor: e }) => schedule(noteOf(e, started.current)),
+      onUpdate: ({ editor: e }) => {
+        const value = noteOf(e, started.current);
+        // The first change to the template makes it a note: from then on it
+        // is kept like any other, even if edited back to the template.
+        if (value !== null) started.current = null;
+        schedule(value);
+      },
       onBlur: flush,
     },
     [shown],
@@ -114,10 +120,13 @@ export default function NoteCard({
   const startEditing = () => {
     // The template as it is now, read when the note is started.
     if (view.isEmpty && template) {
-      editor.commands.setContent(template, {
-        contentType: "markdown",
-        emitUpdate: false,
-      });
+      // Out of the undo history: Ctrl+Z goes back to the template, not past
+      // it to an empty note.
+      editor
+        .chain()
+        .setMeta("addToHistory", false)
+        .setContent(template, { contentType: "markdown", emitUpdate: false })
+        .run();
       started.current = normalizeNote(editor.getMarkdown());
       caret.current = firstEmptyTextblockPos(editor.state.doc);
     }
