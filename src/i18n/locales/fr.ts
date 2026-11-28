@@ -54,6 +54,9 @@ export const fr: Catalog = {
   "settings.tabAudio": "Audio",
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
+  "settings.noteTemplate": "Modèle de mémo",
+  "settings.noteTemplateDesc":
+    "Un nouveau mémo part de ce modèle. Les mémos déjà écrits ne changent pas. Laissez-le vide pour commencer les mémos vierges.",
   "settings.scenes": "Miniatures de scène",
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",

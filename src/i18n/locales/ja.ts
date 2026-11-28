@@ -53,6 +53,9 @@ export const ja = {
   "settings.tabAudio": "オーディオ",
   "settings.language": "言語",
   "settings.languageDesc": "UI の表示言語を切り替えます。",
+  "settings.noteTemplate": "メモのテンプレート",
+  "settings.noteTemplateDesc":
+    "新しいメモはここから始まります。書いたメモは変わりません。空にすると、メモは白紙から始まります。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
   "settings.filmstripFrames": "フィルムストリップのコマ数",

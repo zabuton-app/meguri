@@ -54,6 +54,7 @@ import { ThemeSection } from "./ThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
 import { FolderExclusionsSection } from "./FolderExclusionsSection";
 import { ScanExclusionsSection } from "./ScanExclusionsSection";
+import { NoteTemplateSection } from "./NoteTemplateSection";
 import { useTour } from "@/tour/TourProvider";
 import { useExtraSettingsSections } from "@/settings/extraSections";
 import {
@@ -645,6 +646,8 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </section>
+
+              <NoteTemplateSection />
             </>
           )}
 
