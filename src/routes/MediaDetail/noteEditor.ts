@@ -12,7 +12,7 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import log from "@/lib/logger";
 import { api } from "@/ipc/client";
-import { NoteLink, NoteParagraph } from "./noteExtensions";
+import { NoteLink, NoteListItem, NoteParagraph } from "./noteExtensions";
 import { NOTE_MAX_CHARS, normalizeNote } from "@shared/note";
 
 /** Links in a note are http(s) only; that is all a note link opens to. */
@@ -38,8 +38,10 @@ export function noteExtensions(placeholder: string): Extensions {
       // Replaced below by ones that keep what the user wrote.
       paragraph: false,
       link: false,
+      listItem: false,
     }),
     NoteParagraph,
+    NoteListItem,
     NoteLink.configure({
       openOnClick: false,
       autolink: true,

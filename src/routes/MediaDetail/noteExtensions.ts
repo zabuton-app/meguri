@@ -1,6 +1,7 @@
 // Tiptap extensions the note editor (NoteCard) uses in place of StarterKit's
 // own, where those would change what the user wrote.
 import { Link } from "@tiptap/extension-link";
+import { ListItem } from "@tiptap/extension-list";
 import { Paragraph } from "@tiptap/extension-paragraph";
 
 /**
@@ -31,6 +32,20 @@ export const NoteParagraph = Paragraph.extend({
   renderMarkdown(node, h, ctx) {
     const out = this.parent?.(node, h, ctx) ?? "";
     return escapeLineStarts(out);
+  },
+});
+
+/**
+ * A list item whose Markdown reads back as the same item. ListItem writes an
+ * empty bullet as `- `, which @tiptap/markdown reads back as the text "- "
+ * when it starts a list; `-` reads back as the empty bullet (#345: a
+ * template's list starts with one). A nested empty item gets ListItem's own
+ * placeholder and is left as it is.
+ */
+export const NoteListItem = ListItem.extend({
+  renderMarkdown(node, h, ctx) {
+    const out = this.parent?.(node, h, ctx) ?? "";
+    return out.replace(/^- (?=\n|$)/, "-");
   },
 });
 
