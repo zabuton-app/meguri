@@ -5,6 +5,7 @@
 import { useEditorState } from "@tiptap/react";
 import type { Editor, Extensions } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -12,7 +13,7 @@ import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import log from "@/lib/logger";
 import { api } from "@/ipc/client";
 import { NoteLink, NoteParagraph } from "./noteExtensions";
-import { NOTE_MAX_CHARS } from "@shared/note";
+import { NOTE_MAX_CHARS, normalizeNote } from "@shared/note";
 
 /** Links in a note are http(s) only; that is all a note link opens to. */
 export function isAllowedLink(url: string): boolean {
@@ -97,6 +98,30 @@ export interface NoteMarks extends ActiveMarks {
 }
 
 /** What the toolbar and the character count show, kept up to date. */
+/**
+ * Where to put the caret in a note just started from the template (#345):
+ * inside its first empty line, so writing starts under the first heading.
+ * Null when every line has text.
+ */
+export function firstEmptyTextblockPos(doc: ProseMirrorNode): number | null {
+  let found: number | null = null;
+  doc.descendants((node, pos) => {
+    if (found !== null) return false;
+    if (node.isTextblock && node.content.size === 0) found = pos + 1;
+    return found === null;
+  });
+  return found;
+}
+
+/**
+ * The note an editor holds, as stored: null for no note, and null too while it
+ * is still exactly the template it was started from (`started`).
+ */
+export function noteOf(editor: Editor, started: string | null): string | null {
+  const note = normalizeNote(editor.isEmpty ? null : editor.getMarkdown());
+  return note !== null && note === started ? null : note;
+}
+
 export function useNoteMarks(editor: Editor): NoteMarks {
   return useEditorState({
     editor,

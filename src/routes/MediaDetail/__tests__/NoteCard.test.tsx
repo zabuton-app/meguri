@@ -3,12 +3,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import NoteCard from "@/routes/MediaDetail/NoteCard";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import { SAVE_DELAY_MS } from "@/routes/MediaDetail/useNoteWriter";
+import { NOTE_TEMPLATE_QUERY_KEY } from "@/hooks/useNoteTemplate";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
 import { NOTE_MAX_CHARS } from "@shared/note";
 
 const mocks = vi.hoisted(() => ({
   fileSetNote: vi.fn(),
   openUrl: vi.fn(),
+  noteTemplateGet: vi.fn(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -17,13 +23,26 @@ vi.mock("@/ipc/client", () => ({
       mocks.fileSetNote(...args) as Promise<unknown>,
     openUrl: (url: string): Promise<unknown> =>
       mocks.openUrl(url) as Promise<unknown>,
+    noteTemplateGet: (): Promise<unknown> =>
+      mocks.noteTemplateGet() as Promise<unknown>,
   },
 }));
 
 beforeEach(() => {
   mocks.fileSetNote.mockReset().mockResolvedValue(undefined);
   mocks.openUrl.mockReset().mockResolvedValue(undefined);
+  mocks.noteTemplateGet.mockReset().mockResolvedValue("");
 });
+
+/** A heading, the empty line under it to write on, and a second heading. */
+const TEMPLATE = "## Source\n\n\n\n## Licence";
+
+/** A query client already holding the note template, as Settings leaves it. */
+function withTemplate(template: string) {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(NOTE_TEMPLATE_QUERY_KEY, template);
+  return queryClient;
+}
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -149,5 +168,93 @@ describe("NoteCard", () => {
       />,
     );
     expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+describe("NoteCard with a note template (#345)", () => {
+  /** The Tiptap editor behind the field, as Tiptap leaves it on its element. */
+  function editorOf(): { commands: { undo: () => boolean } } {
+    return (
+      editorEl() as unknown as { editor: { commands: { undo: () => boolean } } }
+    ).editor;
+  }
+
+  it("starts a new note from the template, on its first empty line", async () => {
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
+      queryClient: withTemplate(TEMPLATE),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    expect(screen.getByRole("heading", { name: "Source" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Licence" })).toBeTruthy();
+    paste("pexels");
+    await waitFor(() => expect(mocks.fileSetNote).toHaveBeenCalled(), {
+      timeout: 3000,
+    });
+    const [, , saved] = mocks.fileSetNote.mock.calls.at(-1) as [
+      number,
+      string,
+      string,
+    ];
+    expect(saved).toMatch(/^## Source\s+pexels\s+## Licence\s*$/);
+  });
+
+  it("saves nothing and shows the add button again when the template is left as it is", async () => {
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
+      queryClient: withTemplate(TEMPLATE),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    expect(screen.getByRole("heading", { name: "Source" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await new Promise((r) => setTimeout(r, SAVE_DELAY_MS + 200));
+    expect(mocks.fileSetNote).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Add a note/ })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Source" })).toBeNull();
+  });
+
+  it("stores a note cleared back to the template as no note", async () => {
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
+      queryClient: withTemplate(TEMPLATE),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    expect(screen.getByRole("heading", { name: "Source" })).toBeTruthy();
+    paste("x");
+    await waitFor(() => expect(mocks.fileSetNote).toHaveBeenCalledTimes(1), {
+      timeout: 3000,
+    });
+    act(() => {
+      editorOf().commands.undo();
+    });
+    await waitFor(
+      () => expect(mocks.fileSetNote).toHaveBeenLastCalledWith(7, "ws", null),
+      { timeout: 3000 },
+    );
+  });
+
+  it("uses the template as it is when the note is started", async () => {
+    const queryClient = withTemplate("## Old");
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />, {
+      queryClient,
+    });
+    // Settings changes it while the detail is open; the query cache tells
+    // its observers on the next tick.
+    await act(async () => {
+      queryClient.setQueryData(NOTE_TEMPLATE_QUERY_KEY, "## New");
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    expect(screen.getByRole("heading", { name: "New" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Old" })).toBeNull();
+  });
+
+  it("starts an empty note when the template has not loaded", async () => {
+    mocks.noteTemplateGet.mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<NoteCard fileId={7} wsId="ws" note={null} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add a note/ }));
+    expect(screen.queryByRole("heading")).toBeNull();
+    paste("hello");
+    await waitFor(
+      () => expect(mocks.fileSetNote).toHaveBeenCalledWith(7, "ws", "hello"),
+      { timeout: 3000 },
+    );
   });
 });

@@ -13,17 +13,23 @@ import {
   useState,
 } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import type { Editor } from "@tiptap/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { api } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useNoteTemplate } from "@/hooks/useNoteTemplate";
 import {
   invalidateNoteSearches,
   patchFileDetailInCache,
 } from "@/lib/queryCache";
 import { useNoteWriter } from "./useNoteWriter";
-import { noteExtensions, noteLinkClick, useNoteMarks } from "./noteEditor";
+import {
+  firstEmptyTextblockPos,
+  noteExtensions,
+  noteLinkClick,
+  noteOf,
+  useNoteMarks,
+} from "./noteEditor";
 import { NoteSaveStatus, NoteToolbar } from "./NoteToolbar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,10 +37,6 @@ import { NOTE_MAX_CHARS, normalizeNote } from "@shared/note";
 
 /** Height (px) above which a note is shown collapsed until "Show all". */
 const COLLAPSED_PX = 240;
-
-function noteOf(editor: Editor): string | null {
-  return normalizeNote(editor.isEmpty ? null : editor.getMarkdown());
-}
 
 export default function NoteCard({
   fileId,
@@ -62,6 +64,12 @@ export default function NoteCard({
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const { template } = useNoteTemplate();
+  // A note just started from the template (#345): the template as the editor
+  // wrote it back, which counts as no note until something is typed, and
+  // where the caret goes. Null otherwise.
+  const started = useRef<string | null>(null);
+  const caret = useRef<number | null>(null);
 
   // Stable for the card's lifetime, as the writer's callbacks are: the editor
   // is configured once and keeps calling the ones it was given.
@@ -95,7 +103,7 @@ export default function NoteCard({
         },
         handleDOMEvents: { click: noteLinkClick },
       },
-      onUpdate: ({ editor: e }) => schedule(noteOf(e)),
+      onUpdate: ({ editor: e }) => schedule(noteOf(e, started.current)),
       onBlur: flush,
     },
     [shown],
@@ -104,12 +112,30 @@ export default function NoteCard({
   const view = useNoteMarks(editor);
 
   const startEditing = () => {
+    // The template as it is now, read when the note is started.
+    if (view.isEmpty && template) {
+      editor.commands.setContent(template, {
+        contentType: "markdown",
+        emitUpdate: false,
+      });
+      started.current = normalizeNote(editor.getMarkdown());
+      caret.current = firstEmptyTextblockPos(editor.state.doc);
+    }
     setEditing(true);
     setExpanded(true);
   };
   useEffect(() => {
     editor.setEditable(editing, false);
-    if (editing) editor.commands.focus("end");
+    if (editing) {
+      editor.commands.focus(caret.current ?? "end");
+      caret.current = null;
+    } else if (started.current !== null) {
+      // Left as the template: it was no note, so show none.
+      if (noteOf(editor, started.current) === null) {
+        editor.commands.setContent("", { emitUpdate: false });
+      }
+      started.current = null;
+    }
   }, [editor, editing]);
 
   // The note changed elsewhere (another window, a merge) while nothing is
