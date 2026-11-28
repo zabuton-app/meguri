@@ -62,7 +62,14 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
         await dialog.getByRole("button", { name: "Add", exact: true }).click();
       }
       await dialog.getByRole("button", { name: "Save" }).click();
-      await expect(page.getByText("Scan exclusions saved.")).toBeVisible();
+      // Closed once seen, so the next save's check cannot pass on this
+      // toast while that save is still running (#738).
+      const saved = page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Scan exclusions saved." });
+      await expect(saved).toBeVisible();
+      await saved.getByRole("button", { name: "Close toast" }).click();
+      await expect(saved).toHaveCount(0);
       await closeTopDialog(page);
     };
     const scanButtons = page.getByRole("button", { name: "Scan", exact: true });
