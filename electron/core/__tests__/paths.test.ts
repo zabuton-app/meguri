@@ -155,21 +155,24 @@ describe("isInsideRoot", () => {
     }
   });
 
-  // A synchronous realpath on a root on a network share would block the main
-  // process on every IPC call that checks a path (#687).
-  it("resolves the paths without a synchronous realpath", async () => {
+  // A synchronous realpath or stat on a root on a network share would block
+  // the main process on every IPC call that checks a path (#687).
+  it("resolves the paths without a synchronous realpath or stat", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     fs.mkdirSync(path.join(root, "dir"));
     const file = path.join(root, "a.mp4");
     fs.writeFileSync(file, "x");
     const native = vi.spyOn(fs.realpathSync, "native");
     const sync = vi.spyOn(fs, "realpathSync");
+    const statSync = vi.spyOn(fs, "statSync");
     try {
       expect(await isInsideRoot(file, root)).toBe(true);
       expect(await folderDirInsideRoot(root, "dir")).not.toBeNull();
       expect(sync).not.toHaveBeenCalled();
       expect(native).not.toHaveBeenCalled();
+      expect(statSync).not.toHaveBeenCalled();
     } finally {
+      statSync.mockRestore();
       sync.mockRestore();
       native.mockRestore();
       fs.rmSync(root, { recursive: true, force: true });
