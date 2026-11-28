@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   workspaceSwitch: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   openExternal: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   tagsListAll: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  extListAll: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
 /** A catalog entry the field's tag completion draws from. */
@@ -63,6 +64,7 @@ vi.mock("@/ipc/client", () => ({
       root: "/m",
     }),
     tagsListAll: (...args: unknown[]) => mocks.tagsListAll(...args),
+    extListAll: (...args: unknown[]) => mocks.extListAll(...args),
     workspaceSwitch: (...args: unknown[]) => mocks.workspaceSwitch(...args),
     openExternal: (...args: unknown[]) => mocks.openExternal(...args),
     workspacesList: vi.fn().mockResolvedValue({
@@ -133,6 +135,13 @@ beforeEach(() => {
   mocks.copyFilePath.mockResolvedValue(undefined);
   mocks.workspaceSwitch.mockResolvedValue(undefined);
   mocks.openExternal.mockResolvedValue(undefined);
+  mocks.extListAll.mockResolvedValue({
+    extensions: [
+      { ext: "png", fileCount: 7, workspaceIds: ["ws-other"] },
+      { ext: "mp4", fileCount: 4, workspaceIds: ["ws-test"] },
+      { ext: "mkv", fileCount: 2, workspaceIds: ["ws-test", "ws-other"] },
+    ],
+  });
   mocks.tagsListAll.mockResolvedValue({
     tags: [
       tagSummary("beach", 4),
@@ -892,6 +901,35 @@ describe("search field", () => {
     expect(texts()[0]).toBe("is:favFavorites (is:fav)");
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(chips()).toEqual(["is:fav"]);
+  });
+
+  it("completes ext: with the library's extensions, those on view first (#731)", async () => {
+    renderMenu();
+    type("ext:");
+    await waitFor(() =>
+      expect(texts().slice(0, 3)).toEqual([
+        "ext:mp4Extension: mp44",
+        "ext:mkvExtension: mkv2",
+        "ext:pngExtension: png7",
+      ]),
+    );
+    // Held only in another workspace: muted, after the ones on view.
+    expect(screen.getAllByRole("option")[2].className).toMatch(/text-muted/);
+    type("ext:m");
+    expect(texts().slice(0, 2)).toEqual([
+      "ext:mp4Extension: mp44",
+      "ext:mkvExtension: mkv2",
+    ]);
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(chips()).toEqual(["ext:mp4"]);
+  });
+
+  it("counts a negated extension's files too (#731)", async () => {
+    renderMenu();
+    type("-ext:");
+    await waitFor(() =>
+      expect(texts()[0]).toBe("-ext:mp4Exclude: Extension: mp44"),
+    );
   });
 
   it("offers the prefix a word begins after its search, left open when picked (#730)", () => {

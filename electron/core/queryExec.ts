@@ -31,6 +31,7 @@ import type {
   SearchQuery,
   SearchResult,
   TagList,
+  ExtList,
   WorkspaceStats,
 } from "./types.js";
 
@@ -60,6 +61,7 @@ export type QueryRequest =
   | { kind: "missing"; targets: QueryTarget[]; limit: number }
   // prefer: the workspaces in view, whose tags are kept first at the cap.
   | { kind: "tagsList"; targets: QueryTarget[]; prefer?: string[] }
+  | { kind: "extensions"; targets: QueryTarget[] }
   | { kind: "stats"; targets: QueryTarget[] }
   // Folder view: one real workspace only (the view is off for All and
   // collections), so these take the first target and ignore the rest.
@@ -109,6 +111,7 @@ export type QueryResponse =
   | DuplicatesResult
   | Omit<MissingFilesResult, "scanning">
   | TagList
+  | ExtList
   | WorkspaceStats
   | FolderListing
   | FolderFilesResult
@@ -319,6 +322,8 @@ export class QueryExecutor {
         return cw.listDuplicatesWorkspaces(cores);
       case "missing":
         return cw.listMissingWorkspaces(cores, req.limit);
+      case "extensions":
+        return cw.listExtensionsWorkspaces(cores);
       case "tagsList":
         return cw.listTagsWorkspaces(cores, req.prefer, (t) => this.tagRows(t));
       case "stats": {

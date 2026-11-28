@@ -28,6 +28,8 @@ export type {
   SearchSeekKey,
   TagInfo,
   TagList,
+  ExtList,
+  ExtSummary,
   TagRef,
   TagSourceCount,
   TagSummary,

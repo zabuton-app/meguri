@@ -8,6 +8,7 @@ import { FileX, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { EXT_CATALOG_QUERY_KEY } from "@/hooks/useExtCatalog";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { bulkTargets } from "@/lib/bulkEdit";
@@ -104,8 +105,10 @@ export default function Missing() {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["missing_files"] });
-      // Tags carried only by the files removed are no longer to complete.
+      // Tags and extensions carried only by the files removed are no longer
+      // to complete.
       void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      void qc.invalidateQueries({ queryKey: EXT_CATALOG_QUERY_KEY });
     },
   });
   const onRemove = useCallback(async () => {

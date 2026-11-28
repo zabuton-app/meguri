@@ -3,7 +3,7 @@ import { handle } from "../core/ipcHandler.js";
 import * as tagAdmin from "../core/tagAdmin.js";
 import * as tags from "../core/tags.js";
 import type { Core } from "../core/index.js";
-import type { TagList } from "../core/types.js";
+import type { ExtList, TagList } from "../core/types.js";
 import { retagConditions } from "../../shared/autoTagConditions.js";
 import { AutoTagConfigSchema, type TagRef } from "../../shared/ipc/schema.js";
 import type { IpcContext } from "./context.js";
@@ -91,6 +91,14 @@ export function registerTagHandlers(ctx: IpcContext): void {
           }
         : { kind: "tagsList", targets: queryTargets(scopedCores(ws)) },
     ),
+  );
+  // Every workspace, as the tag catalog for completion is: `ext:` searches
+  // whichever view is shown (#731).
+  handle("ext_list_all", () =>
+    queryClient.run<ExtList>({
+      kind: "extensions",
+      targets: queryTargets(ws.allCores()),
+    }),
   );
   // Mutations are addressed by name, so running them on every Core that
   // ws.metadataCores() returns converges on the same end state even when one

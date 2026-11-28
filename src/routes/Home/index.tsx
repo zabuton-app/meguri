@@ -65,6 +65,7 @@ import {
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { EXT_CATALOG_QUERY_KEY } from "@/hooks/useExtCatalog";
 import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
@@ -605,6 +606,7 @@ export default function Home() {
       // A scan can add tags (new files, the derived-tag backfill), so a tag
       // screen left open would otherwise show a stale catalog.
       void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      void qc.invalidateQueries({ queryKey: EXT_CATALOG_QUERY_KEY });
       // Files go missing and come back with a scan, and a workspace is left
       // out of the missing list while it is being scanned.
       void qc.invalidateQueries({ queryKey: ["missing_files"] });
