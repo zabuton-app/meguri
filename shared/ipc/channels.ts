@@ -600,6 +600,11 @@ export const ChannelInputs = {
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
   logo_images: z.void(),
+  note_template_get: z.void(),
+  // The whole template as Markdown; text that is only whitespace clears it.
+  note_template_set: z.object({
+    template: z.string().max(NOTE_MAX_MARKDOWN),
+  }),
   scan_exclusions_get: z.void(),
   // Each pattern must compile (patternError); main checks again on save.
   scan_exclusions_set_patterns: z.object({
@@ -832,6 +837,10 @@ export interface ChannelOutputs {
   // what they give.
   auto_tag_reapply: { files: number; added: number };
   logo_get: LogoId;
+  // The Markdown a new note starts from, "" for none (#345).
+  note_template_get: string;
+  // Echoes the stored template, so the renderer caches what main kept.
+  note_template_set: string;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;
   // The in-app logo of each variant, as a data URL. The bitmaps come from

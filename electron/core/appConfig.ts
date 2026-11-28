@@ -43,6 +43,7 @@ import type { AutoTagEngine } from "./autoTagDeriver.js";
 import { errorCode, openSettingsDb, type DB } from "./db.js";
 import log from "./logger.js";
 import { libraryDbPath } from "./paths.js";
+import { NOTE_MAX_MARKDOWN } from "../../shared/note.js";
 
 export interface AppConfig {
   /** Registered roots (absolute paths, normalized). */
@@ -74,6 +75,8 @@ export interface AppConfig {
   cssTheme: string | null;
   /** What scans leave out: patterns for every workspace, folders per workspace (#282). */
   scanExclusions: ScanExclusions;
+  /** The Markdown a new note starts from, "" for none (#345). */
+  noteTemplate: string;
 }
 
 export interface CustomCssConfig {
@@ -121,6 +124,7 @@ const FIELD_SET: Record<keyof AppConfig, true> = {
   customCss: true,
   cssTheme: true,
   scanExclusions: true,
+  noteTemplate: true,
 };
 const FIELDS = Object.keys(FIELD_SET) as (keyof AppConfig)[];
 
@@ -169,6 +173,7 @@ function defaultConfig(): AppConfig {
     customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
     cssTheme: null,
     scanExclusions: emptyScanExclusions(),
+    noteTemplate: "",
   };
 }
 
@@ -334,6 +339,7 @@ function parseConfig(c: Record<string, unknown>): AppConfig {
     customCss: parseCustomCss(c.customCss),
     cssTheme: parseCssTheme(c.cssTheme),
     scanExclusions: parseScanExclusions(c.scanExclusions),
+    noteTemplate: parseNoteTemplate(c.noteTemplate),
   };
 }
 
@@ -392,6 +398,12 @@ export function loadConfig(): AppConfig {
 /** 2026-11-10T12:00:00.000Z → 20261110-120000, safe in a file name. */
 function fileTimestamp(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
+}
+
+function parseNoteTemplate(value: unknown): string {
+  return typeof value === "string" && value.length <= NOTE_MAX_MARKDOWN
+    ? value
+    : "";
 }
 
 function parseCssTheme(value: unknown): string | null {
