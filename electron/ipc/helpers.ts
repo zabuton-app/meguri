@@ -66,9 +66,13 @@ export function scopedCores(ws: Workspaces): { id: string; core: Core }[] {
  * go through this: `abs_path` in the DB was written at scan time and can point
  * outside the root after a symlink or root change.
  */
-export function ensureFileInsideRoot(c: Core, id: number): string {
+export async function ensureFileInsideRoot(
+  c: Core,
+  id: number,
+): Promise<string> {
   const abs = tags.absPathOf(c.db, id);
   if (!abs) throw new Error("file not found");
-  if (!isInsideRoot(abs, c.root)) throw new Error("path is outside scan root");
+  if (!(await isInsideRoot(abs, c.root)))
+    throw new Error("path is outside scan root");
   return abs;
 }

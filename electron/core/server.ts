@@ -236,7 +236,7 @@ function realRootOf(core: Core, root: string): Promise<string> {
   return real;
 }
 
-/** isInsideRoot without blocking the main process on a slow share. */
+/** isInsideRoot, with the root resolved once per Core (realRootOf). */
 async function insideRoot(
   core: Core,
   abs: string,

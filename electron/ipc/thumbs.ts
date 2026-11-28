@@ -25,7 +25,7 @@ export function registerThumbHandlers(ctx: IpcContext): void {
     if (!file) throw new Error("file not found");
     if (file.kind !== "video")
       throw new Error("custom thumbnail is only supported for videos");
-    if (!isInsideRoot(file.absPath, c.root))
+    if (!(await isInsideRoot(file.absPath, c.root)))
       throw new Error("path is outside scan root");
     if (sec != null) {
       if (!Number.isFinite(sec) || sec < 0) {
@@ -61,7 +61,7 @@ export function registerThumbHandlers(ctx: IpcContext): void {
     frameExportInFlight = true;
     try {
       const c = coreById(ws, workspaceId);
-      const abs = ensureFileInsideRoot(c, id);
+      const abs = await ensureFileInsideRoot(c, id);
       const base = path.parse(abs).name;
       // Colons aren't filesystem-safe, so the timestamp uses dashes (hh-mm-ss).
       const whole = Math.floor(sec);
