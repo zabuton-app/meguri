@@ -54,6 +54,11 @@ export const es: Catalog = {
   "settings.tabAudio": "Audio",
   "settings.language": "Idioma",
   "settings.languageDesc": "Cambia el idioma de la interfaz.",
+  "settings.noteTemplate": "Plantilla de nota",
+  "settings.noteTemplateDesc":
+    "Las notas nuevas empiezan a partir de esta plantilla. Las notas ya escritas no cambian. Déjala vacía para empezar las notas en blanco.",
+  "settings.noteTemplateLoadFailed":
+    "No se pudo cargar la plantilla de nota. Inténtalo de nuevo.",
   "settings.scenes": "Miniaturas de escena",
   "settings.scenesDesc":
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",

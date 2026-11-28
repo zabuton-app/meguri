@@ -12,6 +12,7 @@ import { registerFileHandlers } from "./files.js";
 import { registerFolderHandlers } from "./folders.js";
 import { registerGraphHandlers } from "./graph.js";
 import { registerLogoHandlers } from "./logo.js";
+import { registerNoteTemplateHandlers } from "./noteTemplate.js";
 import { registerScanHandlers } from "./scan.js";
 import { registerShellHandlers } from "./shell.js";
 import { registerSmartCollectionHandlers } from "./smartCollections.js";
@@ -43,6 +44,7 @@ export function registerIpc(ctx: IpcContext): void {
   registerUpdateHandlers();
   registerCrashReportHandlers(ctx);
   registerLogoHandlers(ctx);
+  registerNoteTemplateHandlers();
   registerCustomCssHandlers(ctx);
   registerCssThemeHandlers(ctx);
   registerSmartCollectionHandlers();

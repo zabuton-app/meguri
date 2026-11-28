@@ -124,6 +124,8 @@ export const INVOKE_CHANNELS = [
   "logo_get",
   "logo_set",
   "logo_images",
+  "note_template_get",
+  "note_template_set",
   "scan_exclusions_get",
   "scan_exclusions_set_patterns",
   "scan_exclusions_folders",

@@ -53,6 +53,11 @@ export const ko: Catalog = {
   "settings.tabAudio": "오디오",
   "settings.language": "언어",
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
+  "settings.noteTemplate": "메모 템플릿",
+  "settings.noteTemplateDesc":
+    "새 메모는 이 템플릿에서 시작합니다. 이미 쓴 메모는 바뀌지 않습니다. 비워 두면 메모를 빈 상태로 시작합니다.",
+  "settings.noteTemplateLoadFailed":
+    "메모 템플릿을 불러오지 못했습니다. 다시 시도해 주세요.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
   "settings.filmstripFrames": "필름스트립 프레임 수",

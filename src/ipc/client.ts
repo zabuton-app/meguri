@@ -298,6 +298,11 @@ export const api = {
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
   /** The in-app logo of each variant, as a data URL. */
   logoImages: () => invoke("logo_images"),
+  /** The Markdown a new note starts from, "" for none (#345). */
+  noteTemplateGet: () => invoke("note_template_get"),
+  /** Store the note template; resolves to what was stored. */
+  noteTemplateSet: (template: string) =>
+    invoke("note_template_set", { template }),
   /** User stylesheet (<userData>/custom.css); the switch is persisted in main's settings. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>

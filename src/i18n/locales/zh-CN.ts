@@ -52,6 +52,10 @@ export const zhCN: Catalog = {
   "settings.tabAudio": "音频",
   "settings.language": "语言",
   "settings.languageDesc": "切换界面的显示语言。",
+  "settings.noteTemplate": "备注模板",
+  "settings.noteTemplateDesc":
+    "新备注从此模板开始。已写好的备注不会改变。留空则新备注从空白开始。",
+  "settings.noteTemplateLoadFailed": "无法加载备注模板。请重试。",
   "settings.scenes": "场景缩略图数量",
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
   "settings.filmstripFrames": "胶片帧数",
