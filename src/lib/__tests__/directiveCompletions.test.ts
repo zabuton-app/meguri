@@ -7,7 +7,11 @@ import {
   prefixSuggestions,
   valueSuggestions,
 } from "@/lib/directiveCompletions";
-import { SEARCH_DIRECTIVE_PREFIXES } from "@shared/tags";
+import {
+  NUMERIC_SEARCH_FIELDS,
+  SEARCH_DIRECTIVE_PREFIXES,
+  parseNumericSearchToken,
+} from "@shared/tags";
 
 describe("DIRECTIVE_COMPLETIONS", () => {
   it("covers every prefix the search box reads", () => {
@@ -134,8 +138,87 @@ describe("valueSuggestions", () => {
     }
   });
 
+  it("offers a few conditions for each numeric directive before anything is typed (#733)", () => {
+    expect(valueSuggestions("size:")).toEqual([
+      "size:>1gb",
+      "size:>100mb",
+      "size:<1mb",
+    ]);
+    expect(valueSuggestions("duration:")).toEqual([
+      "duration:<30s",
+      "duration:>10m",
+      "duration:>1h",
+    ]);
+    expect(valueSuggestions("width:")).toEqual([
+      "width:>=1920",
+      "width:>=1280",
+    ]);
+    expect(valueSuggestions("height:")).toEqual([
+      "height:>=1080",
+      "height:>=720",
+    ]);
+    expect(valueSuggestions("-size:")).toEqual([
+      "-size:>1gb",
+      "-size:>100mb",
+      "-size:<1mb",
+    ]);
+  });
+
+  it("narrows the numeric conditions by what is typed (#733)", () => {
+    expect(valueSuggestions("size:>")).toEqual(["size:>1gb", "size:>100mb"]);
+    expect(valueSuggestions("duration:<")).toEqual(["duration:<30s"]);
+    expect(valueSuggestions("width:>=19")).toEqual(["width:>=1920"]);
+    expect(valueSuggestions("width:>=2000")).toEqual([]);
+  });
+
+  it("offers a typed number with each unit, MB and seconds first (#733)", () => {
+    expect(valueSuggestions("size:>500")).toEqual([
+      "size:>500mb",
+      "size:>500gb",
+      "size:>500kb",
+    ]);
+    expect(valueSuggestions("size:1.5")).toEqual([
+      "size:1.5mb",
+      "size:1.5gb",
+      "size:1.5kb",
+    ]);
+    expect(valueSuggestions("duration:>=90")).toEqual([
+      "duration:>=90s",
+      "duration:>=90m",
+      "duration:>=90h",
+    ]);
+    expect(valueSuggestions("-size:<5")).toEqual([
+      "-size:<5mb",
+      "-size:<5gb",
+      "-size:<5kb",
+    ]);
+  });
+
+  it("narrows the units by a partly typed one (#733)", () => {
+    expect(valueSuggestions("size:>500m")).toEqual(["size:>500mb"]);
+    expect(valueSuggestions("SIZE:>500GB")).toEqual(["size:>500gb"]);
+    expect(valueSuggestions("duration:>90m")).toEqual(["duration:>90m"]);
+    expect(valueSuggestions("size:>500x")).toEqual([]);
+  });
+
+  it("offers no unit after a number for width:, height: or a clock time (#733)", () => {
+    expect(valueSuggestions("width:>1000")).toEqual([]);
+    expect(valueSuggestions("height:720")).toEqual([]);
+    expect(valueSuggestions("duration:1:30")).toEqual([]);
+  });
+
+  it("offers only numeric conditions that parse as the directive (#733)", () => {
+    for (const field of NUMERIC_SEARCH_FIELDS) {
+      for (const draft of [`${field}:`, `${field}:>`, `${field}:<=12`]) {
+        for (const token of valueSuggestions(draft)) {
+          expect(parseNumericSearchToken(token), token).not.toBeNull();
+        }
+      }
+    }
+  });
+
   it("offers no values for a directive whose value is free", () => {
-    for (const draft of ["ext:", "size:", "hash:", "note:"]) {
+    for (const draft of ["ext:", "hash:", "note:"]) {
       expect(valueSuggestions(draft), draft).toEqual([]);
     }
   });

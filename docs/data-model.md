@@ -629,6 +629,15 @@ index, so the count reads every live file; about 15 ms for 100,000 files.
 "No rating" for `0`), the same in the completion, the chip's tooltip and the
 condition row (`directiveLabel`).
 
+`size:`, `duration:`, `width:` and `height:` offer a few common conditions,
+which also show how each is written (`size:>1gb`, `duration:<30s`,
+`width:>=1920`), narrowed by what is typed (#733). Once a number is typed,
+`size:` and `duration:` offer it with each unit (`size:>500` offers `>500mb`,
+`>500gb`, `>500kb`; MB first since Enter takes the first), narrowed by a partly
+typed unit, so a picked value always parses. `width:` and `height:` compare one
+edge each, unlike the resolution tags. Each reads in words by its comparison
+with the value as typed ("Size over 1gb", "Width 1920 or more").
+
 Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;

@@ -385,6 +385,11 @@ export const fr: Catalog = {
   "filter.durationChip": "Durée",
   "filter.widthChip": "Largeur",
   "filter.heightChip": "Hauteur",
+  "filter.numericOver": "{field} : plus de {value}",
+  "filter.numericAtLeast": "{field} : {value} ou plus",
+  "filter.numericUnder": "{field} : moins de {value}",
+  "filter.numericAtMost": "{field} : {value} ou moins",
+  "filter.numericExactly": "{field} : {value}",
   "filter.ratingAtLeast": {
     one: "{count} étoile ou plus",
     other: "{count} étoiles ou plus",

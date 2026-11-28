@@ -29,13 +29,17 @@ export interface DirectiveCompletion {
   prefix: string;
   /** What the prefix reads as in the list: its chip's label. */
   label: TranslationKey;
-  /** The values offered after the colon, when they are a fixed few. */
+  /** The values offered after the colon, when they are a fixed few (or, for
+   *  an open number, a few common ones, #733). */
   values?: readonly string[];
   /** Offered instead while nothing follows the colon, when `values` are
    *  too many to list at once (#732). */
   initial?: readonly string[];
   /** Where the values come from when the library holds them (#731). */
   catalog?: Catalog;
+  /** Offered after a typed number instead, appended to it, first the one
+   *  Enter should take (#733). */
+  units?: readonly string[];
 }
 
 /** The lists of values read from the library, by what they complete. */
@@ -44,11 +48,25 @@ export type Catalog = "ext";
 /** How many values read from the library are offered at once. */
 const MAX_CATALOG_VALUES = 10;
 
-const NUMERIC_LABELS: Record<NumericSearchField, TranslationKey> = {
-  size: "filter.sizeChip",
-  duration: "filter.durationChip",
-  width: "filter.widthChip",
-  height: "filter.heightChip",
+// A few common conditions, which also show how each is written, and the units
+// a typed number can take (#733). MB first, since few mean bytes. `width:` and
+// `height:` compare one edge each, unlike the resolution tags (longer edge).
+const NUMERIC_COMPLETIONS: Record<
+  NumericSearchField,
+  Omit<DirectiveCompletion, "prefix">
+> = {
+  size: {
+    label: "filter.sizeChip",
+    values: [">1gb", ">100mb", "<1mb"],
+    units: ["mb", "gb", "kb"],
+  },
+  duration: {
+    label: "filter.durationChip",
+    values: ["<30s", ">10m", ">1h"],
+    units: ["s", "m", "h"],
+  },
+  width: { label: "filter.widthChip", values: [">=1920", ">=1280"] },
+  height: { label: "filter.heightChip", values: [">=1080", ">=720"] },
 };
 
 // Every `rating:` condition but `>5` and `<0`, which match no file, and `>=0`
@@ -71,7 +89,7 @@ export const DIRECTIVE_COMPLETIONS: Record<
   ext: [{ prefix: EXT_SEARCH_PREFIX, label: "filter.extChip", catalog: "ext" }],
   numeric: NUMERIC_SEARCH_FIELDS.map((field) => ({
     prefix: field,
-    label: NUMERIC_LABELS[field],
+    ...NUMERIC_COMPLETIONS[field],
   })),
   rating: [
     {
@@ -161,10 +179,14 @@ export function valueSuggestions(
   // `ext:` reads `.mp4` as `mp4` (parseExtSearchToken), so a dot narrows alike.
   const partial =
     entry.catalog === "ext" ? typed.partial.replace(/^\./, "") : typed.partial;
-  const values =
-    (partial === "" ? entry.initial : undefined) ??
-    entry.values ??
-    (entry.catalog ? catalogs[entry.catalog] : []);
+  // A number typed after any comparison (`>500`) is offered with each unit;
+  // a partly typed unit then narrows them below.
+  const number = entry.units && /^(?:>=|<=|>|<)?\d+(?:\.\d+)?/.exec(partial);
+  const values = number
+    ? entry.units?.map((unit) => `${number[0]}${unit}`)
+    : ((partial === "" ? entry.initial : undefined) ??
+      entry.values ??
+      (entry.catalog ? catalogs[entry.catalog] : []));
   const not = negated ? SEARCH_NOT : "";
   return (values ?? [])
     .filter((value) => value.startsWith(partial))
