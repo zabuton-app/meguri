@@ -622,6 +622,13 @@ typed, kept a minute, and read again where the tag catalog is: after a scan,
 when a workspace is removed and when missing files are removed. `ext` has no
 index, so the count reads every live file; about 15 ms for 100,000 files.
 
+`rating:` offers its conditions (#732): five before anything is typed (`>=4`,
+`>=3`, `5`, `0`, `<=2`), then every one that begins with what is typed
+(`rating:>` the `>=` and `>` ones). `>5` and `<0` match no file and `>=0` and
+`<=5` every file, so they are left out. Each reads in words ("4 stars and up",
+"No rating" for `0`), the same in the completion, the chip's tooltip and the
+condition row (`directiveLabel`).
+
 Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;

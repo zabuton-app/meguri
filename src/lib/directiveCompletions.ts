@@ -31,6 +31,9 @@ export interface DirectiveCompletion {
   label: TranslationKey;
   /** The values offered after the colon, when they are a fixed few. */
   values?: readonly string[];
+  /** Offered instead while nothing follows the colon, when `values` are
+   *  too many to list at once (#732). */
+  initial?: readonly string[];
   /** Where the values come from when the library holds them (#731). */
   catalog?: Catalog;
 }
@@ -48,6 +51,17 @@ const NUMERIC_LABELS: Record<NumericSearchField, TranslationKey> = {
   height: "filter.heightChip",
 };
 
+// Every `rating:` condition but `>5` and `<0`, which match no file, and `>=0`
+// and `<=5`, which match every file (#732). Grouped by comparison, so typing
+// one (`rating:>=`) lists its values in order.
+const RATING_VALUES = [
+  ...[5, 4, 3, 2, 1].map((n) => `>=${n}`),
+  ...[4, 3, 2, 1, 0].map((n) => `>${n}`),
+  ...[0, 1, 2, 3, 4].map((n) => `<=${n}`),
+  ...[1, 2, 3, 4, 5].map((n) => `<${n}`),
+  ...[0, 1, 2, 3, 4, 5].map(String),
+];
+
 export const DIRECTIVE_COMPLETIONS: Record<
   SearchDirective["kind"],
   readonly DirectiveCompletion[]
@@ -59,7 +73,14 @@ export const DIRECTIVE_COMPLETIONS: Record<
     prefix: field,
     label: NUMERIC_LABELS[field],
   })),
-  rating: [{ prefix: RATING_SEARCH_PREFIX, label: "media.rating" }],
+  rating: [
+    {
+      prefix: RATING_SEARCH_PREFIX,
+      label: "media.rating",
+      values: RATING_VALUES,
+      initial: [">=4", ">=3", "5", "0", "<=2"],
+    },
+  ],
   favorite: [
     {
       prefix: IS_SEARCH_PREFIX,
@@ -140,7 +161,10 @@ export function valueSuggestions(
   // `ext:` reads `.mp4` as `mp4` (parseExtSearchToken), so a dot narrows alike.
   const partial =
     entry.catalog === "ext" ? typed.partial.replace(/^\./, "") : typed.partial;
-  const values = entry.values ?? (entry.catalog ? catalogs[entry.catalog] : []);
+  const values =
+    (partial === "" ? entry.initial : undefined) ??
+    entry.values ??
+    (entry.catalog ? catalogs[entry.catalog] : []);
   const not = negated ? SEARCH_NOT : "";
   return (values ?? [])
     .filter((value) => value.startsWith(partial))

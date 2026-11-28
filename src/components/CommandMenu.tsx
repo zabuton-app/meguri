@@ -1154,8 +1154,14 @@ function DirectiveCompletions({
   if (tokens.length === 0) return null;
   return (
     // Force-mounted, as the tag completions are: they match the end of the
-    // field, not the whole of it.
-    <CommandGroup heading={t("filter.directiveSuggestions")} forceMount>
+    // field, not the whole of it. Mounted afresh when the list changes: cmdk
+    // moves rows in the DOM as it sorts, so a row kept from the list before
+    // would stay ahead of new ones (`rating:` then `rating:>`, #732).
+    <CommandGroup
+      key={tokens.join(" ")}
+      heading={t("filter.directiveSuggestions")}
+      forceMount
+    >
       {tokens.map((token) => {
         const colon = token.indexOf(":") + 1;
         // Only `ext:` values come from the library: they carry a file count,

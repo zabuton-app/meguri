@@ -75,8 +75,67 @@ describe("valueSuggestions", () => {
     expect(catalogWanted("ext: ")).toBeNull();
   });
 
+  it("offers five rating conditions before anything is typed (#732)", () => {
+    expect(valueSuggestions("rating:")).toEqual([
+      "rating:>=4",
+      "rating:>=3",
+      "rating:5",
+      "rating:0",
+      "rating:<=2",
+    ]);
+    expect(valueSuggestions("-rating:")).toEqual([
+      "-rating:>=4",
+      "-rating:>=3",
+      "-rating:5",
+      "-rating:0",
+      "-rating:<=2",
+    ]);
+  });
+
+  it("offers every rating condition that begins with what is typed (#732)", () => {
+    const values = (draft: string) =>
+      valueSuggestions(draft).map((token) => token.slice("rating:".length));
+    expect(values("rating:>=")).toEqual([">=5", ">=4", ">=3", ">=2", ">=1"]);
+    expect(values("rating:>")).toEqual([
+      ">=5",
+      ">=4",
+      ">=3",
+      ">=2",
+      ">=1",
+      ">4",
+      ">3",
+      ">2",
+      ">1",
+      ">0",
+    ]);
+    expect(values("rating:<")).toEqual([
+      "<=0",
+      "<=1",
+      "<=2",
+      "<=3",
+      "<=4",
+      "<1",
+      "<2",
+      "<3",
+      "<4",
+      "<5",
+    ]);
+    expect(values("rating:3")).toEqual(["3"]);
+  });
+
+  it("leaves out rating conditions that match no file or every file (#732)", () => {
+    for (const draft of [
+      "rating:>5",
+      "rating:<0",
+      "rating:>=0",
+      "rating:<=5",
+    ]) {
+      expect(valueSuggestions(draft), draft).toEqual([]);
+    }
+  });
+
   it("offers no values for a directive whose value is free", () => {
-    for (const draft of ["ext:", "rating:", "size:", "hash:", "note:"]) {
+    for (const draft of ["ext:", "size:", "hash:", "note:"]) {
       expect(valueSuggestions(draft), draft).toEqual([]);
     }
   });
