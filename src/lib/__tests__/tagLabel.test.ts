@@ -13,6 +13,18 @@ import { pickMessage, type Message } from "@/i18n/message";
 const t = ((key: string) =>
   (en as Record<string, string>)[key] ?? key) as unknown as TFunc;
 
+// For the labels that take params: picks the plural by `count`, then fills
+// each `{param}` in.
+const rules = new Intl.PluralRules("en");
+const tp = ((key: string, params: Record<string, string | number> = {}) =>
+  pickMessage(
+    (en as Record<string, Message>)[key] ?? key,
+    rules,
+    params.count,
+  ).replace(/\{(\w+)\}/g, (_, name: string) =>
+    String(params[name]),
+  )) as unknown as TFunc;
+
 describe("tagNamespaceLabel", () => {
   it("translates a known namespace", () => {
     expect(tagNamespaceLabel(t, "res")).toBe("Resolution");
@@ -76,34 +88,27 @@ describe("searchTokenLabel", () => {
   });
 
   it("words a rating: directive's comparison (#732)", () => {
-    // These labels take a count, so the lookup fills it in by its plural.
-    const rules = new Intl.PluralRules("en");
-    const tc = ((key: string, params?: { count?: number }) =>
-      pickMessage(
-        (en as Record<string, Message>)[key] ?? key,
-        rules,
-        params?.count,
-      ).replace("{count}", String(params?.count))) as unknown as TFunc;
-    expect(searchTokenLabel(tc, "rating:>=4")).toBe("4 stars and up");
-    expect(searchTokenLabel(tc, "rating:>4")).toBe("More than 4 stars");
-    expect(searchTokenLabel(tc, "rating:<=2")).toBe("2 stars and below");
-    expect(searchTokenLabel(tc, "rating:<2")).toBe("Fewer than 2 stars");
-    expect(searchTokenLabel(tc, "rating:3")).toBe("3 stars");
-    expect(searchTokenLabel(tc, "rating:0")).toBe("No rating");
-    expect(searchTokenLabel(tc, "rating:>=1")).toBe("1 star and up");
-    expect(searchTokenLabel(tc, "rating:1")).toBe("1 star");
+    expect(searchTokenLabel(tp, "rating:>=4")).toBe("4 stars and up");
+    expect(searchTokenLabel(tp, "rating:>4")).toBe("More than 4 stars");
+    expect(searchTokenLabel(tp, "rating:<=2")).toBe("2 stars and below");
+    expect(searchTokenLabel(tp, "rating:<2")).toBe("Fewer than 2 stars");
+    expect(searchTokenLabel(tp, "rating:3")).toBe("3 stars");
+    expect(searchTokenLabel(tp, "rating:0")).toBe("No rating");
+    expect(searchTokenLabel(tp, "rating:>=1")).toBe("1 star and up");
+    expect(searchTokenLabel(tp, "rating:1")).toBe("1 star");
   });
 
   it("names an is:fav directive as favorites (#525)", () => {
     expect(searchTokenLabel(t, "is:fav")).toBe("Favorites (is:fav)");
   });
 
-  it("names a numeric directive by its field and comparison (#524)", () => {
-    expect(searchTokenLabel(t, "SIZE:>1GB")).toBe("Size: >1gb");
-    expect(searchTokenLabel(t, "duration:<1:30")).toBe("Duration: <1:30");
-    expect(searchTokenLabel(t, "width:>=3840")).toBe("Width: >=3840");
-    expect(searchTokenLabel(t, "height:1080")).toBe("Height: 1080");
-    expect(searchTokenLabel(t, "size:big")).toBeNull();
+  it("words a numeric directive's comparison, with the value as typed (#524, #733)", () => {
+    expect(searchTokenLabel(tp, "SIZE:>1GB")).toBe("Size over 1gb");
+    expect(searchTokenLabel(tp, "duration:<1:30")).toBe("Duration under 1:30");
+    expect(searchTokenLabel(tp, "width:>=3840")).toBe("Width 3840 or more");
+    expect(searchTokenLabel(tp, "size:<=10mb")).toBe("Size 10mb or less");
+    expect(searchTokenLabel(tp, "height:1080")).toBe("Height 1080");
+    expect(searchTokenLabel(tp, "size:big")).toBeNull();
   });
 
   it("names a negated directive as an exclusion (#523)", () => {

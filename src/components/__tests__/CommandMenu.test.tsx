@@ -957,6 +957,24 @@ describe("search field", () => {
     expect(chips()).toEqual(["rating:>=5"]);
   });
 
+  it("completes size: with conditions, then a typed number with its units (#733)", () => {
+    renderMenu();
+    type("size:");
+    expect(texts().slice(0, 3)).toEqual([
+      "size:>1gbSize over 1gb",
+      "size:>100mbSize over 100mb",
+      "size:<1mbSize under 1mb",
+    ]);
+    type("size:>500");
+    expect(texts().slice(0, 3)).toEqual([
+      "size:>500mbSize over 500mb",
+      "size:>500gbSize over 500gb",
+      "size:>500kbSize over 500kb",
+    ]);
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(chips()).toEqual(["size:>500mb"]);
+  });
+
   it("offers the prefix a word begins after its search, left open when picked (#730)", () => {
     const { props } = renderMenu();
     type("ra");

@@ -90,6 +90,14 @@ const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
   height: "filter.heightChip",
 };
 
+const NUMERIC_LABEL_KEYS: Record<NumericSearch["op"], TranslationKey> = {
+  ">": "filter.numericOver",
+  ">=": "filter.numericAtLeast",
+  "<": "filter.numericUnder",
+  "<=": "filter.numericAtMost",
+  "=": "filter.numericExactly",
+};
+
 const RATING_LABEL_KEYS: Record<RatingSearch["op"], TranslationKey> = {
   ">=": "filter.ratingAtLeast",
   ">": "filter.ratingAbove",
@@ -113,8 +121,15 @@ export function directiveLabel(
       return `${t("filter.hashChip")}: ${d.value}`;
     case "ext":
       return `${t("filter.extChip")}: ${d.value}`;
-    case "numeric":
-      return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
+    case "numeric": {
+      // Worded by its comparison, with the value as typed (`1gb`, `1:30`).
+      const { field, op } = d.num;
+      const value = op === "=" ? d.value : d.value.slice(op.length);
+      return t(NUMERIC_LABEL_KEYS[op], {
+        field: t(NUMERIC_CHIP_KEYS[field]),
+        value,
+      });
+    }
     case "rating": {
       // Worded as setting a rating reads; a file without one counts as 0.
       const { op, value } = d.rating;
